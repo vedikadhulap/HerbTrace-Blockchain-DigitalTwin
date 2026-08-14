@@ -118,6 +118,11 @@ const transferBatch = async (data) => {
   return existingBatch;
 };
 
+const getBatchById = async (batchId) => {
+  const batch = await Batch.findOne({ batchId });
+  return batch; // returns null if not found — controller handles the 404
+};
+
 const verifyBatch = async (batchId) => {
   const batch = await Batch.findOne({ batchId });
   if (!batch) {

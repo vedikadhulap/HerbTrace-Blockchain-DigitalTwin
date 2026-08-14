@@ -2,16 +2,14 @@ const batchService = require("../services/batchService");
 
 const createBatch = async (req, res) => {
   try {
-    const { batchId, herbType, farmerWallet, latitude, longitude } = req.body;
+    const { batchId, herbType, farmerWallet } = req.body;
 
-    // basic validation — real validation (e.g. Joi/Zod) can come later
     if (!batchId || !herbType || !farmerWallet) {
       return res.status(400).json({ error: "batchId, herbType, and farmerWallet are required" });
     }
 
-    if (latitude === undefined || longitude === undefined) {
-      return res.status(400).json({ error: "latitude and longitude are required" });
-    }
+    // GPS is optional — missing coords are allowed, batch saves with location: null
+    // The frontend will send null values if geolocation is unavailable
 
     const batch = await batchService.createBatch(req.body);
     res.status(201).json(batch);
@@ -38,7 +36,7 @@ const getBatch = async (req, res) => {
 
 const labTest = async (req, res) => {
   try {
-    const { batchId, testResults, labWallet } = req.body;
+    const { batchId, testResults } = req.body;
 
     if (!batchId || !testResults) {
       return res.status(400).json({ error: "batchId and testResults are required" });
@@ -119,7 +117,7 @@ const uploadImage = async (req, res) => {
     const { batchId } = req.body;
 
     if (!batchId || !req.file) {
-      return res.status(400).json({ error: "batchId and an image file are required" });
+      return res.status(400).json({ error: "batchId and a file are required" });
     }
 
     const batch = await batchService.addImageToBatch(batchId, req.file);
@@ -149,6 +147,5 @@ const getQRCode = async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 };
-
 
 module.exports = { createBatch, getBatch, labTest, process, transfer, verify, uploadImage, getQRCode };

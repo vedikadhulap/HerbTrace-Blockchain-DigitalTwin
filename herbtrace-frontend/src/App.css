@@ -1,42 +1,54 @@
 .app-shell {
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    padding: 32px 20px 80px;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0 0 80px;
 }
 
 /* Floating glass nav pill */
 .nav-pill {
-    display: flex;
-    gap: 4px;
-    padding: 6px;
-    margin-bottom: 48px;
-    position: sticky;
-    top: 24px;
-    z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px;
+  margin: 24px 20px 40px;
+  position: sticky;
+  top: 16px;
+  z-index: 100;
+  width: calc(100% - 40px);
+  max-width: 860px;
 }
 
 .nav-pill a {
-    padding: 10px 20px;
-    border-radius: 14px;
-    font-size: 0.9rem;
-    font-weight: 500;
-    color: var(--paper-dim);
-    transition: background 0.2s ease, color 0.2s ease;
+  padding: 9px 18px;
+  border-radius: 12px;
+  font-size: 0.88rem;
+  font-weight: 500;
+  color: var(--paper-dim);
+  transition: background 0.2s ease, color 0.2s ease;
+  white-space: nowrap;
+  text-decoration: none;
 }
 
 .nav-pill a:hover {
-    background: var(--glass-hover);
-    color: var(--paper);
+  background: var(--glass-hover);
+  color: var(--paper);
 }
 
 .nav-pill a.active {
-    background: var(--moss);
-    color: var(--paper);
+  background: var(--moss);
+  color: var(--paper);
 }
 
+/* Home page gets full width */
 .page-content {
-    width: 100%;
-    max-width: 720px;
+  width: 100%;
+  max-width: 720px;
+  padding: 0 20px;
+}
+
+.page-content.full-width {
+  max-width: 100%;
+  padding: 0;
 }

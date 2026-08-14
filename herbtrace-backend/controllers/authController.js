@@ -79,7 +79,14 @@ const login = async (req, res) => {
     }
 
     if (user.status !== "approved") {
-      return res.status(403).json({ error: `Your account is ${user.status}. You cannot log in yet.` });
+      // Return the status as a separate field so the frontend can branch
+      // on "pending" vs "rejected" without parsing the error string
+      return res.status(403).json({
+        error: user.status === "pending"
+          ? "Your account is pending admin review. You'll receive access once approved."
+          : "Your application was not approved. Contact support for more information.",
+        status: user.status,
+      });
     }
 
     const token = jwt.sign(
