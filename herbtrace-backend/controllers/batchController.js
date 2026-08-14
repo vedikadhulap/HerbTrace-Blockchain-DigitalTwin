@@ -2,11 +2,15 @@ const batchService = require("../services/batchService");
 
 const createBatch = async (req, res) => {
   try {
-    const { batchId, herbType, farmerWallet } = req.body;
+    const { batchId, herbType, farmerWallet, latitude, longitude } = req.body;
 
     // basic validation — real validation (e.g. Joi/Zod) can come later
     if (!batchId || !herbType || !farmerWallet) {
       return res.status(400).json({ error: "batchId, herbType, and farmerWallet are required" });
+    }
+
+    if (latitude === undefined || longitude === undefined) {
+      return res.status(400).json({ error: "latitude and longitude are required" });
     }
 
     const batch = await batchService.createBatch(req.body);

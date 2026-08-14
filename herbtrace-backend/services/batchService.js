@@ -4,10 +4,10 @@ const { getContract } = require("./blockchainService");
 const contract = getContract("farmer");
 
 const createBatch = async (data) => {
-  const { batchId, herbType, farmerWallet, farmLocation, harvestDate, quantityKg } = data;
+  const { batchId, herbType, farmerWallet, farmLocation, harvestDate, quantityKg, latitude, longitude } = data;
 
   // 1. Compute a hash of the meaningful data — this is what proves integrity later
-  const dataString = JSON.stringify({ batchId, herbType, farmerWallet, farmLocation, harvestDate, quantityKg });
+  const dataString = JSON.stringify({ batchId, herbType, farmerWallet, farmLocation, harvestDate, quantityKg, latitude, longitude });
   const dataHash = ethers.keccak256(ethers.toUtf8Bytes(dataString));
 
   // 2. Write to the blockchain first — if this fails, we don't want a Mongo record
@@ -21,6 +21,7 @@ const createBatch = async (data) => {
     herbType,
     farmerWallet,
     farmLocation,
+    location: { latitude, longitude },
     harvestDate,
     quantityKg,
     dataHash,
@@ -28,13 +29,6 @@ const createBatch = async (data) => {
     status: "CREATED",
   });
 
-  return batch;
-};
-
-
-
-const getBatchById = async (batchId) => {
-  const batch = await Batch.findOne({ batchId });
   return batch;
 };
 

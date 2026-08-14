@@ -18,6 +18,10 @@ const batchSchema = new mongoose.Schema(
     farmLocation: {
       type: String,
     },
+    location: {
+      latitude: { type: Number },
+      longitude: { type: Number },
+    },
     harvestDate: {
       type: Date,
     },
