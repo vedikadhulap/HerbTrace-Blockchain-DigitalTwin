@@ -18,7 +18,7 @@ app.use("/auth", authRoutes);
 app.use("/batch", batchRoutes);
 
 app.get("/", (req, res) => {
-  res.send("HerbTrace Backend is Running 🚀");
+  res.send("HerbTrace Backend is Running");
 });
 
 const PORT = process.env.PORT || 5000;

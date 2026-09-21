@@ -1,5 +1,7 @@
 const jwt = require("jsonwebtoken");
 
+// protect(requiredRole) — role-specific middleware
+// protect()             — any authenticated user (no role check)
 const protect = (requiredRole) => {
   return (req, res, next) => {
     const authHeader = req.headers.authorization;
@@ -13,11 +15,12 @@ const protect = (requiredRole) => {
     try {
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-      if (decoded.role !== requiredRole) {
+      // If a specific role is required, enforce it
+      if (requiredRole && decoded.role !== requiredRole) {
         return res.status(403).json({ error: `This action requires the ${requiredRole} role.` });
       }
 
-      req.user = decoded; // attach it, in case the route wants userId/role later
+      req.user = decoded; // attach { userId, role } to req for downstream handlers
       next();
     } catch (err) {
       return res.status(401).json({ error: "Invalid or expired token." });

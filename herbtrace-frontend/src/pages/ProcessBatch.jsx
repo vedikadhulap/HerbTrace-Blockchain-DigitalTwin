@@ -1,225 +1,313 @@
-import { useState, useEffect } from "react";
+import { useState, useRef } from "react";
+import { useNavigate } from "react-router-dom";
+import {
+  Hash, Search, CheckCircle, XCircle, Leaf, MapPin, Scale,
+  Settings2, FlaskConical, Percent, Thermometer, Award, Snowflake,
+  Calendar, AlignLeft, FileText, Upload, Loader, GitBranch,
+  ExternalLink, Plus, Timer,
+} from "lucide-react";
 import api from "../api";
+import GPSBar from "../components/GPSBar";
+import ErrorCard from "../components/ErrorCard";
+import StatusPill from "../components/StatusPill";
+import Toast from "../components/Toast";
 
-function useGPS() {
+export default function ProcessBatch() {
+  const navigate = useNavigate();
+  const fileRef  = useRef();
+
   const [coords, setCoords] = useState(null);
-  const [gpsStatus, setGpsStatus] = useState("getting");
-  useEffect(() => {
-    if (!navigator.geolocation) { setGpsStatus("unavailable"); return; }
-    navigator.geolocation.getCurrentPosition(
-      pos => { setCoords({ latitude: pos.coords.latitude, longitude: pos.coords.longitude }); setGpsStatus("captured"); },
-      ()  => setGpsStatus("unavailable")
+  const [parentInput, setParentInput] = useState("");
+  const [confirmedBatches, setConfirmedBatches] = useState([]);
+  const [lookingUp, setLookingUp] = useState(false);
+  const [lookupResults, setLookupResults] = useState(null);
+
+  const [reportFile, setReportFile]   = useState(null);
+  const [submitting, setSubmitting]   = useState(false);
+  const [error, setError]             = useState(null);
+  const [success, setSuccess]         = useState(null);
+  const [toast, setToast]             = useState(null);
+
+  const [form, setForm] = useState({
+    outputProductName: "", processingMethod: "", solventUsed: "", outputQuantity: "",
+    extractionRatio: "", activeCompoundConcentration: "", processingTemperature: "",
+    processingDuration: "", qualityGrade: "", storageConditions: "", expiryDate: "", notes: "",
+  });
+
+  const field = (key) => ({ value: form[key], onChange: e => setForm({ ...form, [key]: e.target.value }) });
+
+  const confirmBatches = async () => {
+    if (!parentInput.trim()) return;
+    const ids = parentInput.split(",").map(s => s.trim()).filter(Boolean);
+    setLookingUp(true); setLookupResults(null);
+    const results = await Promise.all(
+      ids.map(async (id) => {
+        try {
+          const res = await api.get(`/batch/${id}`);
+          return { id, batch: res.data, found: true };
+        } catch {
+          return { id, batch: null, found: false };
+        }
+      })
     );
-  }, []);
-  return { coords, gpsStatus };
-}
-
-function GpsLine({ coords, gpsStatus }) {
-  const info = {
-    getting:     { color: "var(--paper-dim)", text: "Getting your location…" },
-    captured:    { color: "var(--fern-glow)", text: `Location captured (${coords?.latitude?.toFixed(4)}, ${coords?.longitude?.toFixed(4)})` },
-    unavailable: { color: "#E8A87C",          text: "Location unavailable — proceeding without GPS" },
-  }[gpsStatus];
-  return <div className="gps-line" style={{ color: info.color }}>📍 {info.text}</div>;
-}
-
-function ProcessBatch() {
-  const { coords, gpsStatus } = useGPS();
-
-  // Step 1 — parent batch IDs input + confirmation
-  const [rawIds, setRawIds]         = useState("");
-  const [parents, setParents]       = useState([]); // confirmed batch objects
-  const [confirming, setConfirming] = useState(false);
-  const [confirmError, setConfirmError] = useState(null);
-
-  // Step 2 — processor notes
-  const [processorNotes, setProcessorNotes] = useState("");
-  const [submitting, setSubmitting]         = useState(false);
-  const [error, setError]                   = useState(null);
-  const [result, setResult]                 = useState(null);
-
-  // File upload
-  const [uploadFile, setUploadFile]   = useState(null);
-  const [uploading, setUploading]     = useState(false);
-  const [uploadedUrl, setUploadedUrl] = useState(null);
-
-  const handleConfirm = async (e) => {
-    e.preventDefault();
-    const ids = rawIds.split(",").map(s => s.trim()).filter(Boolean);
-    if (!ids.length) { setConfirmError("Enter at least one batch ID."); return; }
-
-    setConfirming(true);
-    setConfirmError(null);
-    setParents([]);
-
-    const found = [];
-    const notFound = [];
-    for (const id of ids) {
-      try {
-        const res = await api.get(`/batch/${id}`);
-        found.push(res.data);
-      } catch {
-        notFound.push(id);
-      }
-    }
-
-    if (notFound.length) {
-      setConfirmError(`Not found: ${notFound.join(", ")}`);
+    setLookupResults(results);
+    if (results.every(r => r.found)) {
+      setConfirmedBatches(results.map(r => r.batch));
     } else {
-      setParents(found);
+      setConfirmedBatches([]);
     }
-    setConfirming(false);
+    setLookingUp(false);
   };
+
+  const allConfirmed = confirmedBatches.length > 0 &&
+    lookupResults && lookupResults.every(r => r.found);
+
+  const requiredFilled = form.outputProductName && form.processingMethod && form.solventUsed &&
+    form.outputQuantity && form.qualityGrade && form.storageConditions && form.expiryDate &&
+    form.notes && reportFile;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setSubmitting(true);
-    setError(null);
+    if (!allConfirmed || !requiredFilled) { setError("Please confirm all batches and fill required fields."); return; }
+    setSubmitting(true); setError(null);
+
     const newBatchId = `PROCESSED-${Date.now()}`;
+    const parentBatchIds = confirmedBatches.map(b => b.batchId);
+
+    const processorNotes = JSON.stringify({
+      outputProductName: form.outputProductName, processingMethod: form.processingMethod,
+      solventUsed: form.solventUsed, outputQuantity: parseFloat(form.outputQuantity),
+      extractionRatio: form.extractionRatio,
+      activeCompoundConcentration: form.activeCompoundConcentration ? parseFloat(form.activeCompoundConcentration) : null,
+      processingTemperature: form.processingTemperature ? parseFloat(form.processingTemperature) : null,
+      processingDuration: form.processingDuration ? parseFloat(form.processingDuration) : null,
+      qualityGrade: form.qualityGrade, storageConditions: form.storageConditions,
+      expiryDate: form.expiryDate, notes: form.notes,
+    });
+
     try {
       const res = await api.post("/batch/process", {
-        newBatchId,
-        parentBatchIds: parents.map(p => p.batchId),
-        processorNotes,
-        latitude:  coords?.latitude  ?? null,
-        longitude: coords?.longitude ?? null,
+        newBatchId, parentBatchIds, processorNotes,
+        latitude:  coords?.latitude  ?? 0,
+        longitude: coords?.longitude ?? 0,
       });
-      setResult(res.data);
+      // Upload processing report
+      const fd = new FormData();
+      fd.append("batchId", newBatchId);
+      fd.append("image", reportFile);
+      await api.post("/batch/upload-image", fd);
+
+      setSuccess({ newBatchId, parentBatchIds, agreedLocation: res.data.agreedLocation });
+      setToast({ message: "Batch processed on-chain!", type: "success" });
     } catch (err) {
-      setError(err.response?.data?.error || "Processing failed.");
+      setError(err.response?.data?.error || "Submission failed.");
     } finally {
       setSubmitting(false);
     }
   };
 
-  const handleReportUpload = async () => {
-    if (!uploadFile || !result) return;
-    setUploading(true);
-    const fd = new FormData();
-    fd.append("batchId", result.batchId);
-    fd.append("image", uploadFile);
-    try {
-      const res = await api.post("/batch/upload-image", fd);
-      setUploadedUrl(res.data.images?.slice(-1)[0] || "");
-    } catch { /* silent */ }
-    setUploading(false);
-  };
-
   return (
-    <div>
-      {/* Step 1 — parent batch lookup */}
-      <div className="glass-panel" style={{ padding: "40px" }}>
-        <h1 style={{ fontSize: "1.8rem" }}>Process Batch</h1>
-        <p style={{ color: "var(--paper-dim)", marginTop: 8 }}>
-          Combine one or more tested batches into a new processed batch.
-        </p>
-        <GpsLine coords={coords} gpsStatus={gpsStatus} />
+    <div style={{ maxWidth: 740, margin: "0 auto" }}>
+      {toast && <Toast message={toast.message} type={toast.type} onDone={() => setToast(null)} />}
 
-        <form onSubmit={handleConfirm} style={{ display: "flex", flexDirection: "column", gap: 14, marginTop: 20 }}>
-          <div>
-            <label className="field-label">Parent batch IDs (comma-separated)</label>
-            <input id="process-parents" type="text" className="field-input"
-              value={rawIds} onChange={e => setRawIds(e.target.value)}
-              placeholder="ASHWAGANDHA-123, ASHWAGANDHA-456"
-              required style={{ fontFamily: "var(--font-mono)", fontSize: "0.88rem" }} />
-            <p style={{ fontSize: "0.78rem", color: "var(--paper-dim)", marginTop: 6 }}>
-              Separate multiple IDs with commas.
-            </p>
-          </div>
-          <button type="submit" className="btn-primary" disabled={confirming}
-            style={{ alignSelf: "flex-start", opacity: confirming ? 0.6 : 1 }}>
-            {confirming ? "Confirming…" : "Confirm batches"}
-          </button>
-        </form>
-
-        {confirmError && <p style={{ color: "#E8A87C", marginTop: 12, fontSize: "0.88rem" }}>{confirmError}</p>}
-
-        {/* Confirmed parent cards */}
-        {parents.length > 0 && !result && (
-          <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 10 }}>
-            {parents.map(p => (
-              <div key={p.batchId} style={{ padding: "14px 18px", borderRadius: 12, background: "rgba(61,107,79,0.12)", border: "1px solid rgba(61,107,79,0.25)" }}>
-                <div style={{ display: "flex", justifyContent: "space-between" }}>
-                  <p style={{ fontWeight: 600, fontSize: "0.88rem", margin: 0 }}>{p.herbType}</p>
-                  <span className="status-pill">{p.status}</span>
-                </div>
-                <p style={{ fontFamily: "var(--font-mono)", fontSize: "0.77rem", color: "var(--paper-dim)", margin: "4px 0 0" }}>{p.batchId}</p>
-                {p.quantityKg && <p style={{ fontSize: "0.8rem", color: "var(--paper-dim)", margin: "3px 0 0" }}>{p.quantityKg} kg</p>}
-              </div>
-            ))}
-          </div>
-        )}
+      <div style={{ marginBottom: 24 }}>
+        <h1 style={{ fontFamily: "var(--font-display)", fontSize: "1.8rem", marginBottom: 4 }}>Process Batch</h1>
+        <p style={{ color: "var(--text-secondary)", fontSize: "0.88rem" }}>Combine verified raw batches into a processed product on-chain.</p>
       </div>
 
-      {/* Step 2 — processor notes */}
-      {parents.length > 0 && !result && (
-        <div className="glass-panel" style={{ padding: "36px", marginTop: 16 }}>
-          <div className="step-indicator" style={{ marginBottom: 20 }}>
-            <div className="step-dot done">1</div>
-            <div className="step-line" />
-            <div className="step-dot active">2</div>
-            <span className="step-label">Processing details</span>
+      <GPSBar onCoordsChange={setCoords} />
+
+      {success ? (
+        <div className="glass-card fade-in" style={{ padding: "40px 36px", textAlign: "center" }}>
+          <CheckCircle size={36} color="var(--fern)" style={{ marginBottom: 16 }} />
+          <h2 style={{ fontFamily: "var(--font-display)", fontSize: "1.5rem", marginBottom: 12 }}>Batch Processed</h2>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10, marginBottom: 8 }}>
+            <code style={{ fontFamily: "var(--font-mono)", fontSize: "0.85rem" }}>{success.newBatchId}</code>
+            <StatusPill status="PROCESSED" />
           </div>
-
-          <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 18 }}>
-            <div>
-              <label className="field-label">Processor notes</label>
-              <textarea id="process-notes" className="field-input"
-                value={processorNotes} onChange={e => setProcessorNotes(e.target.value)}
-                placeholder="e.g. Combined and dried. Output: 80kg standardized 5% withanolide extract."
-                rows={4} style={{ resize: "vertical" }} />
-            </div>
-
-            {error && <p style={{ color: "#E8A87C", fontSize: "0.88rem", margin: 0 }}>{error}</p>}
-
-            <button id="process-submit" type="submit" className="btn-primary"
-              disabled={submitting} style={{ opacity: submitting ? 0.6 : 1 }}>
-              {submitting ? "Writing to chain…" : "Process Batch"}
-            </button>
-          </form>
-        </div>
-      )}
-
-      {/* Success card */}
-      {result && (
-        <div className="glass-panel" style={{ padding: "32px", marginTop: 16 }}>
-          <span className="status-pill">PROCESSED</span>
-          <h2 style={{ fontSize: "1.2rem", marginTop: 12 }}>New batch created</h2>
-          <p style={{ fontFamily: "var(--font-mono)", fontSize: "0.82rem", color: "var(--paper-dim)", marginTop: 6 }}>{result.batchId}</p>
-          <p style={{ color: "var(--paper-dim)", fontSize: "0.85rem", marginTop: 8 }}>
-            Combined from: {result.parentBatchIds?.join(", ")}
-          </p>
-          {result.txHash && (
-            <a href={`https://sepolia.etherscan.io/tx/${result.txHash}`} target="_blank" rel="noreferrer"
-              style={{ color: "var(--fern-glow)", fontSize: "0.82rem", display: "block", marginTop: 10, textDecoration: "underline" }}>
-              View on Etherscan →
-            </a>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, marginBottom: success.agreedLocation ? 8 : 20,
+            fontSize: "0.82rem", color: "var(--text-secondary)" }}>
+            <GitBranch size={14} />
+            From: {success.parentBatchIds.join(", ")}
+          </div>
+          {success.agreedLocation && (
+            <p style={{ fontSize: "0.88rem", color: "var(--text-secondary)", marginBottom: 20, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
+              <MapPin size={14} color="var(--fern)" /> Recorded at: <strong>{success.agreedLocation}</strong>
+            </p>
           )}
-
-          {/* Report upload */}
-          <div style={{ marginTop: 20, paddingTop: 20, borderTop: "1px solid var(--glass-border)" }}>
-            <label className="field-label">Upload processing report (optional)</label>
-            <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-              <input type="file" accept="image/*,application/pdf" onChange={e => setUploadFile(e.target.files[0])}
-                className="field-input" style={{ flex: 1, padding: "9px 14px", cursor: "pointer" }} />
-              {uploadFile && !uploadedUrl && (
-                <button onClick={handleReportUpload} disabled={uploading} className="btn-primary"
-                  style={{ fontSize: "0.85rem", padding: "10px 18px", opacity: uploading ? 0.6 : 1 }}>
-                  {uploading ? "Uploading…" : "Upload"}
-                </button>
-              )}
+          <div style={{ display: "flex", gap: 10, justifyContent: "center" }}>
+            <button className="btn-primary" onClick={() => navigate(`/verify/${success.newBatchId}`)}>
+              <ExternalLink size={14} /> View Batch
+            </button>
+            <button className="btn-ghost" onClick={() => { setSuccess(null); setConfirmedBatches([]); setLookupResults(null); setParentInput(""); setForm({ outputProductName: "", processingMethod: "", solventUsed: "", outputQuantity: "", extractionRatio: "", activeCompoundConcentration: "", processingTemperature: "", processingDuration: "", qualityGrade: "", storageConditions: "", expiryDate: "", notes: "" }); setReportFile(null); }}>
+              <Plus size={14} /> Process Another
+            </button>
+          </div>
+        </div>
+      ) : (
+        <>
+          {/* ── Step 1: Confirm Parent Batches ── */}
+          <div className="glass-card" style={{ padding: "24px 28px", marginBottom: 16 }}>
+            <h3 style={{ fontFamily: "var(--font-display)", fontSize: "1.05rem", marginBottom: 14 }}>Step 1 — Confirm Parent Batches</h3>
+            <div className="field-group" style={{ marginBottom: 12 }}>
+              <label className="field-label"><Hash size={14} /> Parent Batch IDs (comma-separated)</label>
+              <div className="field-input-wrapper">
+                <Hash size={15} className="input-icon" />
+                <input className="field-input" placeholder="e.g. ASHWAGANDHA-001, ASHWAGANDHA-002"
+                  value={parentInput} onChange={e => setParentInput(e.target.value)}
+                  onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); confirmBatches(); } }}
+                  style={{ fontFamily: "var(--font-mono)", fontSize: "0.85rem" }} />
+              </div>
             </div>
-            {uploadedUrl && (
-              <a href={uploadedUrl} target="_blank" rel="noreferrer"
-                style={{ color: "var(--fern-glow)", fontSize: "0.82rem", display: "block", marginTop: 8, textDecoration: "underline" }}>
-                View report on IPFS ↗
-              </a>
+            <button className="btn-ghost" onClick={confirmBatches} disabled={lookingUp}>
+              {lookingUp ? <Loader size={14} className="spin" /> : <Search size={14} />}
+              {lookingUp ? "Confirming…" : "Confirm Batches"}
+            </button>
+
+            {lookupResults && (
+              <div style={{ marginTop: 14, display: "flex", flexDirection: "column", gap: 8 }} className="fade-in">
+                {lookupResults.map(({ id, batch, found }) => (
+                  <div key={id} style={{
+                    padding: "12px 16px", borderRadius: 10, display: "flex", alignItems: "center", gap: 10,
+                    background: found ? "var(--fern-dim)" : "var(--danger-dim)",
+                    border: `1px solid ${found ? "var(--border-glow)" : "rgba(255,128,128,0.2)"}`,
+                  }}>
+                    {found ? <CheckCircle size={14} color="var(--fern)" /> : <XCircle size={14} color="var(--danger)" />}
+                    <code style={{ fontFamily: "var(--font-mono)", fontSize: "0.82rem", flex: 1 }}>{id}</code>
+                    {found && (
+                      <>
+                        <span style={{ fontSize: "0.82rem", color: "var(--text-secondary)" }}>{batch.herbType}</span>
+                        <StatusPill status={batch.status} />
+                        {batch.quantityKg && <span style={{ fontSize: "0.78rem", color: "var(--text-muted)" }}>{batch.quantityKg}kg</span>}
+                        {batch.farmLocation && <span style={{ fontSize: "0.78rem", color: "var(--text-muted)", display: "flex", gap: 4 }}><MapPin size={11} />{batch.farmLocation}</span>}
+                      </>
+                    )}
+                    {!found && <span style={{ fontSize: "0.82rem", color: "var(--danger)" }}>Not found</span>}
+                  </div>
+                ))}
+              </div>
             )}
           </div>
-        </div>
+
+          {/* ── Step 2: Processing Details ── */}
+          {allConfirmed && (
+            <form onSubmit={handleSubmit} className="glass-card" style={{ padding: "28px 28px" }}>
+              <h3 style={{ fontFamily: "var(--font-display)", fontSize: "1.05rem", marginBottom: 20 }}>Step 2 — Processing Details</h3>
+              <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+
+                <div className="field-group">
+                  <label className="field-label"><Leaf size={14} /> Output Product Name *</label>
+                  <input className="field-input" type="text" required placeholder="e.g. Ashwagandha KSM-66 Extract" {...field("outputProductName")} />
+                </div>
+
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+                  <div className="field-group">
+                    <label className="field-label"><Settings2 size={14} /> Processing Method *</label>
+                    <select className="field-select" required {...field("processingMethod")}>
+                      <option value="">Select…</option>
+                      <option>Drying</option><option>Solvent Extraction</option>
+                      <option>Cold Press</option><option>Supercritical CO2 Extraction</option>
+                      <option>Grinding</option><option>Distillation</option>
+                      <option>Fermentation</option><option>Other</option>
+                    </select>
+                  </div>
+                  <div className="field-group">
+                    <label className="field-label"><FlaskConical size={14} /> Solvent Used *</label>
+                    <select className="field-select" required {...field("solventUsed")}>
+                      <option value="">Select…</option>
+                      <option>None (dry process)</option><option>Water</option>
+                      <option>Ethanol</option><option>Methanol</option>
+                      <option>Supercritical CO2</option><option>Hexane</option><option>Other</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 14 }}>
+                  <div className="field-group">
+                    <label className="field-label"><Scale size={14} /> Output Qty (kg) *</label>
+                    <input className="field-input" type="number" min="0.1" step="0.1" required placeholder="e.g. 80" {...field("outputQuantity")} />
+                  </div>
+                  <div className="field-group">
+                    <label className="field-label"><Percent size={14} /> Extraction Ratio</label>
+                    <input className="field-input" type="text" placeholder="e.g. 10:1" {...field("extractionRatio")} />
+                  </div>
+                  <div className="field-group">
+                    <label className="field-label"><Percent size={14} /> Active Compound (%)</label>
+                    <input className="field-input" type="number" min="0" max="100" step="0.01" placeholder="e.g. 5" {...field("activeCompoundConcentration")} />
+                  </div>
+                </div>
+
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+                  <div className="field-group">
+                    <label className="field-label"><Thermometer size={14} /> Processing Temp (°C)</label>
+                    <input className="field-input" type="number" placeholder="e.g. 55" {...field("processingTemperature")} />
+                  </div>
+                  <div className="field-group">
+                    <label className="field-label"><Timer size={14} /> Duration (hours)</label>
+                    <input className="field-input" type="number" min="0" step="0.5" placeholder="e.g. 48" {...field("processingDuration")} />
+                  </div>
+                </div>
+
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+                  <div className="field-group">
+                    <label className="field-label"><Award size={14} /> Quality Grade *</label>
+                    <select className="field-select" required {...field("qualityGrade")}>
+                      <option value="">Select…</option>
+                      <option>Grade A</option><option>Grade B</option>
+                      <option>Grade C</option><option>Reject</option>
+                    </select>
+                  </div>
+                  <div className="field-group">
+                    <label className="field-label"><Snowflake size={14} /> Storage Conditions *</label>
+                    <select className="field-select" required {...field("storageConditions")}>
+                      <option value="">Select…</option>
+                      <option>Room Temperature</option><option>Cool & Dry</option>
+                      <option>Refrigerated (2–8°C)</option><option>Frozen (&lt;-18°C)</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="field-group">
+                  <label className="field-label"><Calendar size={14} /> Batch Expiry Date *</label>
+                  <input className="field-input" type="date" required {...field("expiryDate")} />
+                </div>
+
+                <div className="field-group">
+                  <label className="field-label"><AlignLeft size={14} /> Processor Notes *</label>
+                  <textarea className="field-textarea" required
+                    placeholder="e.g. Combined and dried at 55°C for 48h. Output: 80kg standardized 5% withanolide extract."
+                    {...field("notes")} />
+                </div>
+
+                {/* Processing Report upload */}
+                <div className="field-group">
+                  <label className="field-label"><FileText size={14} /> Processing Report *</label>
+                  {reportFile ? (
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, color: "var(--fern)", fontSize: "0.88rem" }}>
+                      <CheckCircle size={16} /> {reportFile.name}
+                      <button type="button" onClick={() => setReportFile(null)} style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer" }}>Change</button>
+                    </div>
+                  ) : (
+                    <div className="upload-zone" onClick={() => fileRef.current?.click()} style={{ flexDirection: "column", display: "flex", alignItems: "center" }}>
+                      <Upload size={22} color="var(--fern)" />
+                      <span style={{ fontSize: "0.85rem" }}>Upload processing report (image or PDF) — required</span>
+                      <input ref={fileRef} type="file" accept="image/*,application/pdf" style={{ display: "none" }}
+                        onChange={e => setReportFile(e.target.files[0])} />
+                    </div>
+                  )}
+                </div>
+
+                <ErrorCard error={error} />
+
+                <button type="submit" className="btn-primary" disabled={submitting || !requiredFilled}>
+                  {submitting ? <Loader size={16} className="spin" /> : <CheckCircle size={16} />}
+                  {submitting ? "Recording on-chain…" : "Submit Processing Record"}
+                </button>
+              </div>
+            </form>
+          )}
+        </>
       )}
     </div>
   );
 }
-
-export default ProcessBatch;

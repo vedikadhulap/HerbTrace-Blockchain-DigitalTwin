@@ -1,273 +1,383 @@
-import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useState, useEffect, useRef } from "react";
+import { useNavigate } from "react-router-dom";
+import {
+  Search, UserPlus, Link2, Database, MapPin, ShieldCheck, Lock,
+  Sprout, FlaskConical, Settings2, Truck, ScanLine, ArrowRight,
+  FileText, Code, Activity, Hash, QrCode, GitBranch, ExternalLink,
+} from "lucide-react";
+import api from "../api";
+import StatusPill from "../components/StatusPill";
 
-const STEPS = [
-  { icon: "🌿", role: "Farmer",      desc: "Records harvest batch: herb type, location, quantity, GPS coordinates" },
-  { icon: "🧪", role: "Lab",         desc: "Tests the batch and records results on-chain: pesticide levels, moisture, certifications" },
-  { icon: "⚙️", role: "Processor",   desc: "Combines raw batches into a processed product, linking all parent batches" },
-  { icon: "🚚", role: "Distributor", desc: "Records the final custody transfer to the retailer, completing the on-chain trail" },
+/* ── Small helpers ───────────────────────────────────────────── */
+function TrustPill({ icon: Icon, label }) {
+  return (
+    <div style={{
+      display: "flex", alignItems: "center", gap: 7,
+      padding: "8px 16px", borderRadius: 999,
+      border: "1px solid var(--border)", background: "var(--bg-card)",
+      fontSize: "0.82rem", color: "var(--text-secondary)",
+      backdropFilter: "blur(12px)",
+    }}>
+      <Icon size={14} color="var(--fern)" />
+      {label}
+    </div>
+  );
+}
+
+function StatNum({ value, label }) {
+  return (
+    <div style={{ textAlign: "center", padding: "0 16px" }}>
+      <div style={{
+        fontFamily: "var(--font-display)", fontSize: "2.4rem", fontWeight: 400,
+        background: "var(--gradient-text)", WebkitBackgroundClip: "text",
+        WebkitTextFillColor: "transparent", lineHeight: 1.1,
+      }}>{value}</div>
+      <div style={{ fontSize: "0.78rem", color: "var(--text-muted)", marginTop: 6,
+        letterSpacing: "0.04em", textTransform: "uppercase" }}>{label}</div>
+    </div>
+  );
+}
+
+function StatDivider() {
+  return <div style={{ width: 1, height: 48, background: "var(--border)", flexShrink: 0 }} />;
+}
+
+function relativeTime(dateStr) {
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const min  = Math.floor(diff / 60000);
+  if (min < 1)  return "just now";
+  if (min < 60) return `${min}m ago`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24)  return `${hr}h ago`;
+  return `${Math.floor(hr / 24)}d ago`;
+}
+
+const STEP_FLOW = [
+  { icon: Sprout,       num: "01", title: "Farmer",      desc: "Records harvest: herb type, GPS-verified farm location, quantity, farming method" },
+  { icon: FlaskConical, num: "02", title: "Lab",         desc: "Tests and certifies: pesticide levels, heavy metals, moisture, active compound, uploads certificate" },
+  { icon: Settings2,    num: "03", title: "Processor",   desc: "Combines raw batches into a finished product, linking all ingredient batches on-chain" },
+  { icon: Truck,        num: "04", title: "Distributor", desc: "Records final custody transfer to retailer, completing the verified supply chain trail" },
 ];
 
-const WHY = [
+const FEATURE_CARDS = [
   {
-    icon: "🔒",
-    title: "Tamper-Proof Records",
-    body: "Once written to the blockchain, no one can quietly edit a batch record. Every change creates a new transaction.",
+    icon: ShieldCheck, title: "Tamper-Proof Records",
+    desc: "Every batch record is hashed using Ethereum's keccak256 algorithm and written on-chain. Editing a record after the fact changes the hash — the fraud becomes visible instantly.",
   },
   {
-    icon: "📍",
-    title: "GPS at Every Stage",
-    body: "Location coordinates are captured and hashed at every step — farm, lab, processor, distributor. Provenance is provable, not just claimed.",
+    icon: MapPin, title: "GPS-Verified Locations",
+    desc: "Farm coordinates are captured by the device at submission time and verified against the typed location via OpenStreetMap reverse geocoding. If they don't match, the batch is rejected.",
   },
   {
-    icon: "📱",
-    title: "Anyone Can Verify",
-    body: "No app download. No account. A consumer scans the QR code on any phone and sees the full verified history instantly.",
+    icon: QrCode, title: "Scan to Verify",
+    desc: "Every batch gets a unique QR code. A consumer scans it with any phone camera — no app needed — and sees the full certified history from farm to shelf.",
   },
 ];
 
-const ROLES = [
-  { role: "farmer",      icon: "🌿", title: "Farmer",      desc: "Register your harvests on-chain. Upload Kisan ID or land papers to get approved." },
-  { role: "lab",         icon: "🧪", title: "Lab",          desc: "Record test results for batches. Upload your accreditation certificate to get approved." },
-  { role: "processor",   icon: "⚙️", title: "Processor",    desc: "Record processed batches and link their raw ingredients. Upload business registration." },
-  { role: "distributor", icon: "🚚", title: "Distributor",  desc: "Record the final custody handoff to retailers. Upload your distribution license." },
+const ROLE_CARDS = [
+  { icon: Sprout,       role: "farmer",      label: "Farmer",      desc: "Record your harvests with GPS-verified location, farming method, and quantity.", proof: "Kisan ID or land ownership papers" },
+  { icon: FlaskConical, role: "lab",         label: "Lab",         desc: "Certify batches with structured test results and a mandatory uploaded certificate.", proof: "Lab accreditation certificate" },
+  { icon: Settings2,    role: "processor",   label: "Processor",   desc: "Combine verified raw batches into finished products, linking all ingredients on-chain.", proof: "Business registration or GST certificate" },
+  { icon: Truck,        role: "distributor", label: "Distributor", desc: "Record the final handoff to retailers, completing the verifiable supply chain.", proof: "Distribution license" },
 ];
 
-function Home() {
+export default function Home() {
   const navigate = useNavigate();
-  const [consumerBatchId, setConsumerBatchId] = useState("");
+  const [verifyId, setVerifyId]         = useState("");
+  const [batchCount, setBatchCount]     = useState(null);
+  const [recentBatches, setRecentBatches] = useState([]);
+  const intervalRef = useRef(null);
 
-  const handleConsumerVerify = (e) => {
+  const fetchStats = async () => {
+    try {
+      const [countRes, recentRes] = await Promise.all([
+        api.get("/batch/count"),
+        api.get("/batch/recent"),
+      ]);
+      setBatchCount(countRes.data.count);
+      setRecentBatches(recentRes.data);
+    } catch { /* silently ignore — stats are non-critical */ }
+  };
+
+  useEffect(() => {
+    fetchStats();
+    intervalRef.current = setInterval(fetchStats, 30000);
+    return () => clearInterval(intervalRef.current);
+  }, []);
+
+  const handleVerify = (e) => {
     e.preventDefault();
-    if (consumerBatchId.trim()) {
-      navigate(`/verify/${consumerBatchId.trim()}`);
-    }
+    if (verifyId.trim()) navigate(`/verify/${verifyId.trim()}`);
   };
 
   return (
-    <div style={{ width: "100%" }}>
-      {/* ─── HERO ────────────────────────────────────────────── */}
+    <div>
+      {/* ── Hero ──────────────────────────────────────────────── */}
       <section style={{
-        minHeight: "92vh",
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "center",
-        textAlign: "center",
-        padding: "0 24px",
-        position: "relative",
-        overflow: "hidden",
+        minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center",
+        flexDirection: "column", textAlign: "center", padding: "0 24px",
+        position: "relative", overflow: "hidden",
       }}>
-        {/* Radial glow behind text */}
-        <div style={{
-          position: "absolute",
-          inset: 0,
-          background: "radial-gradient(ellipse 60% 55% at 50% 40%, rgba(61,107,79,0.18) 0%, transparent 70%)",
-          pointerEvents: "none",
-        }} />
+        <div style={{ position: "absolute", top: "-10%", left: "-5%", width: 520, height: 520, borderRadius: "50%", background: "radial-gradient(circle, rgba(61,107,79,0.22) 0%, transparent 70%)", pointerEvents: "none" }} />
+        <div style={{ position: "absolute", bottom: "-10%", right: "-5%", width: 380, height: 380, borderRadius: "50%", background: "radial-gradient(circle, rgba(127,168,140,0.13) 0%, transparent 70%)", pointerEvents: "none" }} />
 
-        <div style={{ position: "relative", maxWidth: 680 }}>
+        <div style={{ position: "relative", maxWidth: 700, margin: "0 auto" }} className="fade-in-up">
           <div style={{
-            display: "inline-block",
-            padding: "5px 16px",
-            borderRadius: 999,
-            background: "rgba(168,230,184,0.1)",
-            border: "1px solid rgba(168,230,184,0.2)",
-            fontSize: "0.8rem",
-            color: "var(--fern-glow)",
-            fontFamily: "var(--font-mono)",
-            marginBottom: 28,
-            letterSpacing: "0.05em",
+            display: "inline-flex", alignItems: "center", gap: 7, padding: "6px 14px",
+            borderRadius: 999, border: "1px solid var(--border-glow)", background: "var(--fern-dim)",
+            fontSize: "0.78rem", color: "var(--fern)", marginBottom: 28, letterSpacing: "0.03em",
           }}>
-            ETHEREUM SEPOLIA TESTNET
+            <Sprout size={13} /> Blockchain Supply Chain Platform
           </div>
 
           <h1 style={{
-            fontSize: "clamp(2.4rem, 6vw, 4rem)",
-            lineHeight: 1.12,
-            marginBottom: 20,
-            fontFamily: "var(--font-display)",
-            fontWeight: 700,
+            fontFamily: "var(--font-display)", fontSize: "clamp(2.4rem, 6vw, 3.8rem)",
+            fontWeight: 400, lineHeight: 1.15, color: "var(--text-primary)", marginBottom: 22,
           }}>
-            From Soil to Shelf —{" "}
-            <span style={{ color: "var(--fern-glow)" }}>Every Step Verified</span>
+            From Soil to Shelf —<br />
+            Every Step <span className="gradient-text">Verified</span>
           </h1>
 
-          <p style={{
-            fontSize: "clamp(1rem, 2.5vw, 1.18rem)",
-            color: "var(--paper-dim)",
-            lineHeight: 1.7,
-            marginBottom: 40,
-            maxWidth: 540,
-            margin: "0 auto 40px",
-          }}>
+          <p style={{ fontSize: "1.05rem", color: "var(--text-secondary)", lineHeight: 1.75, maxWidth: 520, margin: "0 auto 36px" }}>
             HerbTrace records every stage of your herbal product's journey on the Ethereum blockchain.
             Tamper-proof. GPS-verified. Scannable by anyone.
           </p>
 
-          <div style={{ display: "flex", gap: 14, justifyContent: "center", flexWrap: "wrap" }}>
-            <Link to="/verify" className="btn-primary" style={{ fontSize: "1rem", padding: "15px 32px" }}>
-              Verify a Batch
-            </Link>
-            <Link to="/signup" className="btn-outline" style={{ fontSize: "1rem", padding: "14px 32px" }}>
-              Join as a Partner
-            </Link>
+          <div style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap", marginBottom: 28 }}>
+            <button className="btn-primary" onClick={() => navigate("/verify")}>
+              <Search size={16} /> Verify a Batch
+            </button>
+            <button className="btn-ghost" onClick={() => navigate("/signup")}>
+              <UserPlus size={16} /> Join as a Partner
+            </button>
+          </div>
+
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+            fontSize: "0.78rem", color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}>
+            <ShieldCheck size={12} color="var(--fern)" />
+            Deployed on Ethereum Sepolia · Open source · Zero data brokers
           </div>
         </div>
       </section>
 
-      {/* ─── TRUST BAR ───────────────────────────────────────── */}
-      <section style={{
-        display: "flex",
-        justifyContent: "center",
-        gap: 12,
-        flexWrap: "wrap",
-        padding: "0 24px 80px",
-      }}>
-        {["Ethereum Sepolia Testnet", "IPFS Document Storage", "GPS-Verified Locations"].map(label => (
-          <span key={label} style={{
-            padding: "8px 20px",
-            borderRadius: 999,
-            background: "var(--glass)",
-            border: "1px solid var(--glass-border)",
-            fontSize: "0.82rem",
-            color: "var(--paper-dim)",
-            fontFamily: "var(--font-mono)",
-          }}>
-            {label}
-          </span>
-        ))}
-      </section>
-
-      {/* ─── HOW IT WORKS ────────────────────────────────────── */}
-      <section style={{ padding: "80px 24px", maxWidth: 960, margin: "0 auto" }}>
-        <h2 style={{ textAlign: "center", fontSize: "clamp(1.6rem, 4vw, 2.2rem)", marginBottom: 16 }}>
-          The Chain of Custody, Made Transparent
-        </h2>
-        <p style={{ textAlign: "center", color: "var(--paper-dim)", fontSize: "0.95rem", marginBottom: 56 }}>
-          Every stage is recorded on-chain by a different wallet, making the entire trail independently verifiable.
-        </p>
-
-        {/* Steps row */}
-        <div style={{ display: "flex", alignItems: "flex-start", gap: 0, justifyContent: "center", flexWrap: "wrap" }}>
-          {STEPS.map((step, i) => (
-            <div key={step.role} style={{ display: "flex", alignItems: "flex-start" }}>
-              <div style={{ textAlign: "center", width: 180 }}>
-                <div style={{
-                  width: 56, height: 56,
-                  borderRadius: "50%",
-                  background: "var(--glass)",
-                  border: "1px solid var(--glass-border)",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  fontSize: "1.5rem",
-                  margin: "0 auto 14px",
-                }}>
-                  {step.icon}
-                </div>
-                <div style={{ fontWeight: 600, fontSize: "0.95rem", marginBottom: 8, color: "var(--fern-glow)" }}>
-                  {step.role}
-                </div>
-                <p style={{ fontSize: "0.82rem", color: "var(--paper-dim)", lineHeight: 1.6, margin: 0 }}>
-                  {step.desc}
-                </p>
-              </div>
-              {i < STEPS.length - 1 && (
-                <div style={{
-                  flex: "0 0 40px",
-                  height: 1,
-                  borderTop: "2px dashed rgba(127,168,140,0.3)",
-                  marginTop: 27,
-                  alignSelf: "flex-start",
-                }} />
-              )}
-            </div>
-          ))}
-        </div>
-
-        <p style={{
-          textAlign: "center",
-          marginTop: 48,
-          fontSize: "0.92rem",
-          color: "var(--paper-dim)",
-          fontStyle: "italic",
+      {/* ── Live Stats Bar ────────────────────────────────────── */}
+      <section style={{ padding: "0 24px 60px" }}>
+        <div className="glass-card" style={{
+          maxWidth: 820, margin: "0 auto", padding: "36px 48px",
+          display: "flex", alignItems: "center", justifyContent: "center", gap: 0,
         }}>
-          Then a consumer scans the QR code on the product and sees the entire journey instantly.
-        </p>
+          <StatNum value={batchCount !== null ? `${batchCount}+` : "…"} label="Batches Tracked" />
+          <StatDivider />
+          <StatNum value="100%" label="On-Chain Records" />
+          <StatDivider />
+          <StatNum value="< 2s" label="Verification Time" />
+          <StatDivider />
+          <StatNum value="0"    label="Data Breaches" />
+        </div>
       </section>
 
-      {/* ─── WHY HERBTRACE ───────────────────────────────────── */}
-      <section style={{ padding: "80px 24px", background: "rgba(255,255,255,0.015)" }}>
-        <div style={{ maxWidth: 960, margin: "0 auto" }}>
-          <h2 style={{ textAlign: "center", fontSize: "clamp(1.6rem, 4vw, 2.2rem)", marginBottom: 48 }}>
-            Why HerbTrace?
+      {/* ── Trust Bar ────────────────────────────────────────── */}
+      <section style={{ padding: "0 24px 64px" }}>
+        <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
+          <TrustPill icon={Link2}      label="Ethereum Sepolia" />
+          <TrustPill icon={Database}   label="IPFS Storage" />
+          <TrustPill icon={MapPin}     label="GPS-Verified" />
+          <TrustPill icon={ShieldCheck}label="Role-Based Access" />
+          <TrustPill icon={Lock}       label="Tamper-Proof Hashing" />
+        </div>
+      </section>
+
+      <div className="section-divider" style={{ margin: "0 24px 64px" }} />
+
+      {/* ── How It Works ──────────────────────────────────────── */}
+      <section style={{ padding: "0 24px 80px" }}>
+        <div style={{ maxWidth: 900, margin: "0 auto" }}>
+          <h2 style={{ fontFamily: "var(--font-display)", fontSize: "2rem", textAlign: "center", marginBottom: 8 }}>
+            The Chain of Custody, Made Transparent
           </h2>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 20 }}>
-            {WHY.map(card => (
-              <div key={card.title} className="glass-panel" style={{ padding: "32px 28px" }}>
-                <div style={{ fontSize: "1.8rem", marginBottom: 16 }}>{card.icon}</div>
-                <h3 style={{ fontSize: "1.05rem", marginBottom: 10 }}>{card.title}</h3>
-                <p style={{ color: "var(--paper-dim)", fontSize: "0.88rem", lineHeight: 1.7, margin: 0 }}>
-                  {card.body}
-                </p>
+          <p style={{ textAlign: "center", color: "var(--text-secondary)", marginBottom: 48 }}>
+            Every role in the supply chain leaves a verifiable, immutable record.
+          </p>
+
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 0, position: "relative" }}>
+            <div style={{
+              position: "absolute", top: 40, left: "12.5%", right: "12.5%",
+              height: 1, background: "linear-gradient(90deg, transparent, var(--border-glow), var(--fern), var(--border-glow), transparent)",
+              zIndex: 0,
+            }} />
+            {STEP_FLOW.map((s, i) => (
+              <div key={i} style={{ textAlign: "center", padding: "0 16px", position: "relative", zIndex: 1 }}>
+                <div style={{ fontSize: "0.65rem", fontFamily: "var(--font-mono)", color: "var(--text-muted)", marginBottom: 8 }}>{s.num}</div>
+                <div style={{
+                  width: 80, height: 80, borderRadius: "50%",
+                  border: "1px solid var(--border-glow)", background: "var(--bg-card)",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  margin: "0 auto 16px", boxShadow: "0 0 24px var(--glow)", backdropFilter: "blur(12px)",
+                }}>
+                  <s.icon size={28} color="var(--fern)" />
+                </div>
+                <div style={{ fontFamily: "var(--font-display)", fontWeight: 600, fontSize: "1rem", marginBottom: 8 }}>{s.title}</div>
+                <div style={{ fontSize: "0.8rem", color: "var(--text-secondary)", lineHeight: 1.6 }}>{s.desc}</div>
+              </div>
+            ))}
+          </div>
+
+          <p style={{ textAlign: "center", marginTop: 40, color: "var(--text-secondary)", fontSize: "0.9rem",
+            display: "flex", alignItems: "center", justifyContent: "center", gap: 7 }}>
+            <ScanLine size={14} color="var(--fern)" />
+            A consumer scans the QR code on any phone and sees the full verified journey — no app, no account, no friction.
+          </p>
+        </div>
+      </section>
+
+      <div className="section-divider" style={{ margin: "0 24px 64px" }} />
+
+      {/* ── Feature Cards ─────────────────────────────────────── */}
+      <section style={{ padding: "0 24px 80px" }}>
+        <div style={{ maxWidth: 900, margin: "0 auto" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 18 }}>
+            {FEATURE_CARDS.map((f, i) => (
+              <div key={i} className="glass-card" style={{ padding: "28px 24px", borderTop: "2px solid var(--fern)" }}>
+                <div style={{
+                  width: 52, height: 52, borderRadius: "50%", background: "var(--fern-dim)",
+                  border: "1px solid var(--border-glow)", display: "flex", alignItems: "center",
+                  justifyContent: "center", marginBottom: 16,
+                }}>
+                  <f.icon size={24} color="var(--fern)" />
+                </div>
+                <div style={{ fontWeight: 600, fontSize: "1rem", marginBottom: 8 }}>{f.title}</div>
+                <div style={{ fontSize: "0.85rem", color: "var(--text-secondary)", lineHeight: 1.7 }}>{f.desc}</div>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* ─── ROLE CARDS ──────────────────────────────────────── */}
-      <section style={{ padding: "80px 24px", maxWidth: 960, margin: "0 auto" }}>
-        <h2 style={{ textAlign: "center", fontSize: "clamp(1.6rem, 4vw, 2.2rem)", marginBottom: 14 }}>
-          Are you part of the supply chain?
-        </h2>
-        <p style={{ textAlign: "center", color: "var(--paper-dim)", fontSize: "0.92rem", marginBottom: 44 }}>
-          Each role gets a dedicated dashboard. Accounts are reviewed by an admin before access is granted.
-        </p>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 16 }}>
-          {ROLES.map(r => (
-            <div key={r.role} className="glass-panel" style={{ padding: "28px 22px", display: "flex", flexDirection: "column" }}>
-              <div style={{ fontSize: "1.5rem", marginBottom: 12 }}>{r.icon}</div>
-              <h3 style={{ fontSize: "1rem", marginBottom: 8 }}>{r.title}</h3>
-              <p style={{ color: "var(--paper-dim)", fontSize: "0.83rem", lineHeight: 1.6, flex: 1, margin: "0 0 20px" }}>
-                {r.desc}
-              </p>
-              <Link
-                to={`/signup?role=${r.role}`}
-                className="btn-outline"
-                style={{ fontSize: "0.82rem", padding: "9px 16px", textAlign: "center" }}
-              >
-                Sign Up as {r.title}
-              </Link>
-            </div>
-          ))}
+      {/* ── Role Cards ────────────────────────────────────────── */}
+      <section style={{ padding: "0 24px 80px" }}>
+        <div style={{ maxWidth: 900, margin: "0 auto" }}>
+          <h2 style={{ fontFamily: "var(--font-display)", fontSize: "1.8rem", textAlign: "center", marginBottom: 8 }}>
+            Join the Supply Chain
+          </h2>
+          <p style={{ textAlign: "center", color: "var(--text-secondary)", marginBottom: 40, fontSize: "0.95rem" }}>
+            Each role has verified access to its stage of the process.
+          </p>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 16 }}>
+            {ROLE_CARDS.map((r) => (
+              <div key={r.role} className="glass-card" style={{ padding: "24px 22px", display: "flex", flexDirection: "column", gap: 12 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <div style={{
+                    width: 40, height: 40, borderRadius: "50%", background: "var(--fern-dim)",
+                    border: "1px solid var(--border-glow)", display: "flex", alignItems: "center", justifyContent: "center",
+                  }}>
+                    <r.icon size={18} color="var(--fern)" />
+                  </div>
+                  <span style={{ fontFamily: "var(--font-display)", fontWeight: 600, fontSize: "1rem" }}>{r.label}</span>
+                </div>
+                <p style={{ fontSize: "0.85rem", color: "var(--text-secondary)", lineHeight: 1.6, margin: 0 }}>{r.desc}</p>
+                <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: "0.78rem", color: "var(--text-muted)" }}>
+                  <FileText size={12} /> Requires: {r.proof}
+                </div>
+                <button className="btn-ghost btn-sm" style={{ alignSelf: "flex-start" }} onClick={() => navigate("/signup")}>
+                  <UserPlus size={14} /> Sign Up as {r.label}
+                </button>
+              </div>
+            ))}
+          </div>
         </div>
       </section>
 
-      {/* ─── CONSUMER VERIFY ─────────────────────────────────── */}
-      <section style={{ padding: "0 24px 100px", maxWidth: 680, margin: "0 auto", width: "100%" }}>
-        <div className="glass-panel" style={{ padding: "40px 36px", textAlign: "center" }}>
-          <h2 style={{ fontSize: "1.4rem", marginBottom: 10 }}>Have a product?</h2>
-          <p style={{ color: "var(--paper-dim)", fontSize: "0.92rem", marginBottom: 28 }}>
-            Enter or scan its batch ID to see the full verified history.
-          </p>
-          <form onSubmit={handleConsumerVerify} style={{ display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "center" }}>
-            <input
-              id="home-verify-input"
-              type="text"
-              value={consumerBatchId}
-              onChange={e => setConsumerBatchId(e.target.value)}
-              placeholder="e.g. ASHWAGANDHA-1723456789"
-              className="field-input"
-              style={{ flex: "1 1 260px", fontFamily: "var(--font-mono)", fontSize: "0.88rem" }}
-            />
-            <button type="submit" className="btn-primary" style={{ flexShrink: 0 }}>
-              Verify Batch
-            </button>
-          </form>
+      {/* ── Recent Activity Feed ──────────────────────────────── */}
+      <section style={{ padding: "0 24px 80px" }}>
+        <div style={{ maxWidth: 680, margin: "0 auto" }}>
+          <div className="glass-card" style={{ padding: "28px 28px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 20 }}>
+              <Activity size={18} color="var(--fern)" />
+              <h3 style={{ fontFamily: "var(--font-display)", fontSize: "1.15rem" }}>Recent Activity</h3>
+            </div>
+            {recentBatches.length === 0 ? (
+              <p style={{ color: "var(--text-muted)", fontSize: "0.88rem", textAlign: "center", padding: "20px 0" }}>
+                No activity yet — be the first to create a batch.
+              </p>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                {recentBatches.map((b) => (
+                  <div key={b._id} style={{
+                    display: "flex", alignItems: "center", gap: 12,
+                    padding: "10px 14px", borderRadius: 12, background: "rgba(255,255,255,0.02)",
+                    border: "1px solid var(--border)",
+                  }}>
+                    <code style={{ fontFamily: "var(--font-mono)", fontSize: "0.8rem", color: "var(--text-secondary)", flex: 1 }}>
+                      {b.batchId}
+                    </code>
+                    <span style={{ fontSize: "0.82rem", color: "var(--text-secondary)" }}>{b.herbType}</span>
+                    <StatusPill status={b.status} />
+                    <span style={{ fontSize: "0.75rem", color: "var(--text-muted)", fontFamily: "var(--font-mono)", whiteSpace: "nowrap" }}>
+                      {relativeTime(b.updatedAt)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </section>
+
+      {/* ── Consumer Verify CTA ──────────────────────────────── */}
+      <section style={{ padding: "0 24px 80px" }}>
+        <div style={{ maxWidth: 680, margin: "0 auto" }}>
+          <div className="glass-card" style={{ padding: "48px 40px", textAlign: "center" }}>
+            <ScanLine size={36} color="var(--fern)" style={{ marginBottom: 20 }} />
+            <h2 style={{ fontFamily: "var(--font-display)", fontSize: "1.8rem", marginBottom: 12 }}>
+              Have a product in hand?
+            </h2>
+            <p style={{ color: "var(--text-secondary)", marginBottom: 28, fontSize: "0.92rem" }}>
+              Enter the batch ID printed on the label or scan the QR code.
+            </p>
+            <form onSubmit={handleVerify} style={{ display: "flex", gap: 10 }}>
+              <div className="field-input-wrapper" style={{ flex: 1 }}>
+                <Hash size={15} className="input-icon" />
+                <input
+                  className="field-input"
+                  placeholder="Batch ID — e.g. ASHWAGANDHA-1786892130"
+                  value={verifyId}
+                  onChange={e => setVerifyId(e.target.value)}
+                  style={{ fontFamily: "var(--font-mono)", fontSize: "0.85rem" }}
+                />
+              </div>
+              <button type="submit" className="btn-primary" disabled={!verifyId.trim()}>
+                <ArrowRight size={16} /> Verify Now
+              </button>
+            </form>
+          </div>
+        </div>
+      </section>
+
+      {/* ── Footer ───────────────────────────────────────────── */}
+      <footer style={{
+        borderTop: "1px solid var(--border)", padding: "32px 40px",
+        display: "flex", justifyContent: "space-between", alignItems: "center",
+        flexWrap: "wrap", gap: 16, color: "var(--text-muted)",
+      }}>
+        <div>
+          <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 6 }}>
+            <Sprout size={14} color="var(--fern)" />
+            <span style={{ fontFamily: "var(--font-display)", color: "var(--text-secondary)" }}>HerbTrace</span>
+          </div>
+          <span style={{ fontSize: "0.75rem", fontFamily: "var(--font-mono)" }}>
+            Blockchain-powered herbal traceability.
+          </span>
+        </div>
+        <div style={{ display: "flex", gap: 20, fontSize: "0.82rem" }}>
+          <a href="/verify" style={{ color: "var(--text-muted)", textDecoration: "none" }}>Verify</a>
+          <a href="/login"  style={{ color: "var(--text-muted)", textDecoration: "none" }}>Login</a>
+          <a href="/signup" style={{ color: "var(--text-muted)", textDecoration: "none" }}>Sign Up</a>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: "0.75rem", fontFamily: "var(--font-mono)", color: "var(--text-muted)", width: "100%" }}>
+          <Code size={12} />
+          Built on Ethereum Sepolia · Powered by IPFS · Open for audit
+        </div>
+      </footer>
     </div>
   );
 }
-
-export default Home;

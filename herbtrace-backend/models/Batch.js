@@ -2,54 +2,60 @@ const mongoose = require("mongoose");
 
 const batchSchema = new mongoose.Schema(
   {
-    batchId: {
-      type: String,
-      required: true,
-      unique: true, // enforced at the DB level — no two batches share an ID
-    },
-    herbType: {
-      type: String,
-      required: true,
-    },
-    farmerWallet: {
-      type: String,
-      required: true,
-    },
-    farmLocation: {
-      type: String,
-    },
+    batchId:           { type: String, required: true, unique: true },
+    // chainId threads the Merkle tree across stage transitions.
+    // A raw batch sets chainId = its own batchId.
+    // A processed batch inherits chainId from its first parent (raw) batch.
+    // This means all 4 stages (Create→Test→Process→Transfer) share one tree.
+    chainId:           { type: String, index: true },
+    herbType:          { type: String, required: true },
+    herbVariety:       { type: String },
+    farmingMethod:     { type: String, enum: ["Organic", "Conventional", "Biodynamic", "Wildcrafted"] },
+    estimatedMoisture: { type: Number },
+    lotNumber:         { type: String },
+    expectedDryWeight: { type: Number },
+    farmerWallet:      { type: String, required: true },
+    farmLocation:      { type: String },
     location: {
-      latitude: { type: Number },
+      latitude:  { type: Number },
       longitude: { type: Number },
     },
-    harvestDate: {
-      type: Date,
+    harvestDate: { type: Date },
+    quantityKg:  { type: Number },
+    images:      [{ type: String }], // IPFS URLs
+    status:      { type: String, enum: ["CREATED", "TESTED", "PROCESSED", "TRANSFERRED"], default: "CREATED" },
+    dataHash:    { type: String, required: true }, // hash written on-chain
+    txHash:      { type: String }, // Ethereum transaction hash — look up on Etherscan
+
+    // User attribution
+    createdBy:     { type: mongoose.Schema.Types.ObjectId, ref: "User" }, // Farmer user ID
+    testedBy:      { type: mongoose.Schema.Types.ObjectId, ref: "User" }, // Lab user ID
+    processedBy:   { type: mongoose.Schema.Types.ObjectId, ref: "User" }, // Processor user ID
+    transferredBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" }, // Distributor user ID
+
+    // Lineage — parent raw batches that were combined in processBatch
+    parentBatchIds: [{ type: String }],
+
+    // Lab stage data
+    labData:     { type: mongoose.Schema.Types.Mixed },
+    labLocation: {
+      latitude:  { type: Number },
+      longitude: { type: Number },
     },
-    quantityKg: {
-      type: Number,
+
+    // Processor stage data
+    processorData:   { type: mongoose.Schema.Types.Mixed },
+    processLocation: {
+      latitude:  { type: Number },
+      longitude: { type: Number },
     },
-    images: [
-      {
-        type: String, // IPFS URLs, added when we build Pinata upload in Phase 7
-      },
-    ],
-    status: {
-      type: String,
-      enum: ["CREATED", "TESTED", "PROCESSED", "TRANSFERRED"],
-      default: "CREATED",
+
+    // Distributor stage data
+    transferData:     { type: mongoose.Schema.Types.Mixed },
+    transferLocation: {
+      latitude:  { type: Number },
+      longitude: { type: Number },
     },
-    dataHash: {
-      type: String, // the hash actually written on-chain for this batch's current state
-      required: true,
-    },
-    txHash: {
-      type: String, // the Ethereum transaction hash — lets you look this up on Etherscan
-    },
-    parentBatchIds: [
-      {
-        type: String, // for processBatch — tracks lineage from raw batches
-      },
-    ],
   },
   { timestamps: true } // adds createdAt / updatedAt automatically
 );
