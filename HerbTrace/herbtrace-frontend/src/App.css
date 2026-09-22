@@ -1,0 +1,59 @@
+/* ── App Shell ──────────────────────────────────────────────────── */
+.app-shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.page-content {
+  flex: 1;
+  padding: 24px;
+  max-width: 900px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.page-content.full-width {
+  max-width: 100%;
+  padding: 0;
+}
+
+/* ── Navbar ─────────────────────────────────────────────────────── */
+.nav-bar {
+  position: sticky; top: 0; z-index: 100;
+  display: flex; align-items: center; gap: 4px;
+  padding: 10px 20px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+.nav-logo {
+  display: flex; align-items: center; gap: 8px;
+  font-family: var(--font-display); font-size: 1.1rem; font-weight: 600;
+  color: var(--text-primary); text-decoration: none;
+  margin-right: 8px; padding: 6px 10px;
+}
+.nav-logo:hover { color: var(--fern); }
+
+.nav-link {
+  display: flex; align-items: center; gap: 6px;
+  padding: 7px 13px; border-radius: 9px;
+  font-size: 0.86rem; font-weight: 500;
+  color: var(--text-secondary); text-decoration: none;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.nav-link:hover { background: var(--fern-dim); color: var(--text-primary); }
+.nav-link.active { background: var(--fern-dim); color: var(--fern); }
+
+.nav-spacer { flex: 1; }
+
+.nav-icon-btn {
+  display: flex; align-items: center; justify-content: center;
+  width: 34px; height: 34px; border-radius: 9px;
+  background: none; border: 1px solid var(--border);
+  color: var(--text-secondary); cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.nav-icon-btn:hover { background: var(--fern-dim); border-color: var(--fern); color: var(--fern); }

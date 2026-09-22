@@ -1,0 +1,235 @@
+{
+  "timestamp": "2026-09-21T20:58:05.854Z",
+  "environment": {
+    "mode": "Real External-Oracle Mode",
+    "blockchain": "Local Hardhat",
+    "database": "Local MongoDB Memory Server"
+  },
+  "runs": {
+    "attempted": 3,
+    "successful": 3,
+    "failed": 0
+  },
+  "statistics": {
+    "Oracle": {
+      "Total Aggregation": {
+        "runs": 12,
+        "min": 311,
+        "max": 1195,
+        "mean": 461.08,
+        "median": 393.5,
+        "stdDev": 233.6,
+        "p95": 1195,
+        "unit": "ms"
+      }
+    },
+    "MongoDB": {
+      "LocationVerification.findOneAndUpdate": {
+        "runs": 12,
+        "min": 5,
+        "max": 56,
+        "mean": 13.83,
+        "median": 9.5,
+        "stdDev": 13.36,
+        "p95": 56,
+        "unit": "ms"
+      },
+      "Batch.create": {
+        "runs": 6,
+        "min": 4,
+        "max": 16,
+        "mean": 8.17,
+        "median": 6,
+        "stdDev": 4.78,
+        "p95": 16,
+        "unit": "ms"
+      },
+      "BatchMerkleRoot.findOne": {
+        "runs": 12,
+        "min": 2,
+        "max": 8,
+        "mean": 4.58,
+        "median": 4.5,
+        "stdDev": 2.02,
+        "p95": 8,
+        "unit": "ms"
+      },
+      "BatchMerkleRoot.save": {
+        "runs": 12,
+        "min": 3,
+        "max": 10,
+        "mean": 5.83,
+        "median": 5.5,
+        "stdDev": 2.15,
+        "p95": 10,
+        "unit": "ms"
+      },
+      "Batch.findOne": {
+        "runs": 6,
+        "min": 3,
+        "max": 6,
+        "mean": 4.5,
+        "median": 4,
+        "stdDev": 1.12,
+        "p95": 6,
+        "unit": "ms"
+      },
+      "Batch.save": {
+        "runs": 6,
+        "min": 2,
+        "max": 10,
+        "mean": 5.5,
+        "median": 5,
+        "stdDev": 2.5,
+        "p95": 10,
+        "unit": "ms"
+      },
+      "Batch.find": {
+        "runs": 3,
+        "min": 2,
+        "max": 8,
+        "mean": 4.33,
+        "median": 3,
+        "stdDev": 2.62,
+        "p95": 8,
+        "unit": "ms"
+      },
+      "BatchMerkleRoot.findOneAndUpdate": {
+        "runs": 3,
+        "min": 8,
+        "max": 8,
+        "mean": 8,
+        "median": 8,
+        "stdDev": 0,
+        "p95": 8,
+        "unit": "ms"
+      }
+    },
+    "Blockchain": {
+      "Submission (createBatch)": {
+        "runs": 3,
+        "min": 590,
+        "max": 1051,
+        "mean": 746.67,
+        "median": 599,
+        "stdDev": 215.23,
+        "p95": 1051,
+        "unit": "ms"
+      },
+      "Receipt Confirmation (wait)": {
+        "runs": 15,
+        "min": 4851,
+        "max": 24732,
+        "mean": 13627.13,
+        "median": 12473,
+        "stdDev": 5448.05,
+        "p95": 24732,
+        "unit": "ms"
+      },
+      "Submission (recordTest)": {
+        "runs": 3,
+        "min": 585,
+        "max": 647,
+        "mean": 619.33,
+        "median": 626,
+        "stdDev": 25.75,
+        "p95": 647,
+        "unit": "ms"
+      },
+      "Submission (processBatch)": {
+        "runs": 3,
+        "min": 574,
+        "max": 3785,
+        "mean": 1756,
+        "median": 909,
+        "stdDev": 1441.22,
+        "p95": 3785,
+        "unit": "ms"
+      },
+      "Submission (transferCustody)": {
+        "runs": 3,
+        "min": 608,
+        "max": 882,
+        "mean": 707.33,
+        "median": 632,
+        "stdDev": 123.9,
+        "p95": 882,
+        "unit": "ms"
+      },
+      "Submission (anchorMerkleRoot)": {
+        "runs": 3,
+        "min": 573,
+        "max": 822,
+        "mean": 660,
+        "median": 585,
+        "stdDev": 114.66,
+        "p95": 822,
+        "unit": "ms"
+      }
+    },
+    "Merkle": {
+      "buildMerkleTree": {
+        "runs": 12,
+        "min": 0,
+        "max": 1,
+        "mean": 0.17,
+        "median": 0,
+        "stdDev": 0.37,
+        "p95": 1,
+        "unit": "ms"
+      }
+    },
+    "HTTP": {
+      "POST /batch/": {
+        "runs": 3,
+        "min": 9567,
+        "max": 21958,
+        "mean": 14100.67,
+        "median": 10777,
+        "stdDev": 5577.89,
+        "p95": 21958,
+        "unit": "ms"
+      },
+      "POST /batch/lab-test": {
+        "runs": 3,
+        "min": 13462,
+        "max": 13699,
+        "mean": 13566.33,
+        "median": 13538,
+        "stdDev": 98.81,
+        "p95": 13699,
+        "unit": "ms"
+      },
+      "POST /batch/process": {
+        "runs": 3,
+        "min": 9072,
+        "max": 22010,
+        "mean": 14836,
+        "median": 13426,
+        "stdDev": 5375.19,
+        "p95": 22010,
+        "unit": "ms"
+      },
+      "POST /batch/transfer": {
+        "runs": 3,
+        "min": 22799,
+        "max": 39117,
+        "mean": 32223.33,
+        "median": 34754,
+        "stdDev": 6897.95,
+        "p95": 39117,
+        "unit": "ms"
+      },
+      "Full Lifecycle Execution": {
+        "runs": 3,
+        "min": 68075,
+        "max": 83600,
+        "mean": 74726.33,
+        "median": 72504,
+        "stdDev": 6529.96,
+        "p95": 83600,
+        "unit": "ms"
+      }
+    }
+  }
+}
