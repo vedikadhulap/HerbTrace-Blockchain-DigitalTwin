@@ -1,0 +1,125 @@
+{
+  "title": "Ethereum Sepolia On-Chain Deployment & Functional Validation",
+  "network": {
+    "name": "sepolia",
+    "chainId": "11155111",
+    "rpcProvider": "Alchemy (eth-sepolia)"
+  },
+  "contract": {
+    "address": "0x721069cf9EF3eF6C8fd7C5d8d6f1b1487015b330",
+    "version": "v3 (Failure Resilience Edition)"
+  },
+  "validationTimestamp": "2026-09-28T16:33:52.582Z",
+  "overallStatus": "PASSED",
+  "syntheticBatches": {
+    "rawBatchId": "SEP-VAL-1790613140808-RAW",
+    "procBatchId": "SEP-VAL-1790613140808-PROC"
+  },
+  "transactions": [
+    {
+      "step": 1,
+      "operation": "createBatch()",
+      "batchId": "SEP-VAL-1790613140808-RAW",
+      "actor": "0xC490620E2c7fFCdB4A640dec73da6551062f2Fb8",
+      "role": "FARMER_ROLE",
+      "transactionHash": "0xfb238b13aea53d7007dc4ace8fd33e91b7d88fb86714ced04181bb59df801565",
+      "blockNumber": 11801733,
+      "receiptStatus": 1,
+      "gasUsed": "119262",
+      "resultingContractStatus": "Created",
+      "etherscanUrl": "https://sepolia.etherscan.io/tx/0xfb238b13aea53d7007dc4ace8fd33e91b7d88fb86714ced04181bb59df801565"
+    },
+    {
+      "step": 2,
+      "operation": "recordTest(PASS)",
+      "batchId": "SEP-VAL-1790613140808-RAW",
+      "actor": "0x20Fe2c5d074128b6c411BAF5CF704863C7764e50",
+      "role": "LAB_ROLE",
+      "transactionHash": "0x26be950d2acfd92df8ca0fc59b91cdbda895664a0412b9ab2dd32f574591e121",
+      "blockNumber": 11801734,
+      "receiptStatus": 1,
+      "gasUsed": "52959",
+      "resultingContractStatus": "Tested",
+      "etherscanUrl": "https://sepolia.etherscan.io/tx/0x26be950d2acfd92df8ca0fc59b91cdbda895664a0412b9ab2dd32f574591e121"
+    },
+    {
+      "step": 3,
+      "operation": "processBatch()",
+      "batchId": "SEP-VAL-1790613140808-PROC",
+      "parentBatchIds": [
+        "SEP-VAL-1790613140808-RAW"
+      ],
+      "actor": "0x61E3f0448395f8Fd239a968a2a319c8526D99faF",
+      "role": "PROCESSOR_ROLE",
+      "transactionHash": "0x0c6563e7563b9b18f7440f6787906490c56547a45b821f728b4de9aeac292dee",
+      "blockNumber": 11801736,
+      "receiptStatus": 1,
+      "gasUsed": "176356",
+      "resultingContractStatus": "Processed",
+      "etherscanUrl": "https://sepolia.etherscan.io/tx/0x0c6563e7563b9b18f7440f6787906490c56547a45b821f728b4de9aeac292dee"
+    },
+    {
+      "step": 4,
+      "operation": "transferCustody()",
+      "batchId": "SEP-VAL-1790613140808-PROC",
+      "newOwner": "0x2999b14C8B373Aea1bAaC0e2879fc497a479F761",
+      "actor": "0x2999b14C8B373Aea1bAaC0e2879fc497a479F761",
+      "role": "DISTRIBUTOR_ROLE",
+      "transactionHash": "0xba050966a6f57288dd66c13fd5501e5e40880ee558f1ae61437fc399fa83c18c",
+      "blockNumber": 11801737,
+      "receiptStatus": 1,
+      "gasUsed": "52823",
+      "resultingContractStatus": "Transferred",
+      "etherscanUrl": "https://sepolia.etherscan.io/tx/0xba050966a6f57288dd66c13fd5501e5e40880ee558f1ae61437fc399fa83c18c"
+    },
+    {
+      "step": 5,
+      "operation": "anchorMerkleRoot()",
+      "batchId": "SEP-VAL-1790613140808-PROC",
+      "stageIndex": 3,
+      "merkleRoot": "0xa130de54172185b4393ef8416f89e159faf8ebfc2aa21a66a3f2cfab1f7f0097",
+      "actor": "0x2999b14C8B373Aea1bAaC0e2879fc497a479F761",
+      "role": "DISTRIBUTOR_ROLE",
+      "transactionHash": "0xa7e6479da4c8adaf68d3b380f38af9b32b7bbe22418a736cb1e9fd76a3daef06",
+      "blockNumber": 11801739,
+      "receiptStatus": 1,
+      "gasUsed": "198776",
+      "resultingContractStatus": "Anchored",
+      "etherscanUrl": "https://sepolia.etherscan.io/tx/0xa7e6479da4c8adaf68d3b380f38af9b32b7bbe22418a736cb1e9fd76a3daef06"
+    }
+  ],
+  "onChainVerification": {
+    "rawBatch": {
+      "batchId": "SEP-VAL-1790613140808-RAW",
+      "owner": "0xC490620E2c7fFCdB4A640dec73da6551062f2Fb8",
+      "statusNumeric": 1,
+      "statusName": "Tested",
+      "expectedStatus": "Tested",
+      "statusValid": true
+    },
+    "processedBatch": {
+      "batchId": "SEP-VAL-1790613140808-PROC",
+      "owner": "0x2999b14C8B373Aea1bAaC0e2879fc497a479F761",
+      "statusNumeric": 3,
+      "statusName": "Transferred",
+      "expectedStatus": "Transferred",
+      "statusValid": true,
+      "ownerValid": true
+    },
+    "lineage": {
+      "childBatchId": "SEP-VAL-1790613140808-PROC",
+      "parents": [
+        "SEP-VAL-1790613140808-RAW"
+      ],
+      "expectedParent": "SEP-VAL-1790613140808-RAW",
+      "lineageValid": true
+    },
+    "merkleAnchor": {
+      "anchored": true,
+      "root": "0xa130de54172185b4393ef8416f89e159faf8ebfc2aa21a66a3f2cfab1f7f0097",
+      "expectedRoot": "0xa130de54172185b4393ef8416f89e159faf8ebfc2aa21a66a3f2cfab1f7f0097",
+      "merkleValid": true,
+      "totalAnchorsCount": 1
+    }
+  }
+}

@@ -1,7 +1,7 @@
 const hre = require("hardhat");
 
 async function main() {
-  const contractAddress = "0x5Ce1bdace5d3276f9b8f290E2AFdA74819a1A6A2"; // V3 deployed contract
+  const contractAddress = "0x721069cf9EF3eF6C8fd7C5d8d6f1b1487015b330"; // HerbTrace v3 deployed contract
 
   const farmerWallet      = "0xC490620E2c7fFCdB4A640dec73da6551062f2Fb8";
   const labWallet         = "0x20Fe2c5d074128b6c411BAF5CF704863C7764e50";
