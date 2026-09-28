@@ -1,0 +1,201 @@
+{
+  "timestamp": "2026-09-21T20:15:35.507Z",
+  "environment": "Node.js (Standalone Experiment)",
+  "syntheticScenarios": [
+    {
+      "scenario": "SCENARIO 1 — Strong agreement",
+      "description": "All 4 oracles respond with coordinates very close to each other (<20m apart).",
+      "type": "synthetic",
+      "threshold": 100,
+      "successCount": 4,
+      "failureCount": 0,
+      "consensus": "verified",
+      "verified": true,
+      "expectedConsensus": "verified",
+      "pass": true,
+      "durationMs": 1,
+      "agreementPairsCount": 6,
+      "pairwiseDistances": [
+        {
+          "oracles": [
+            "nominatim",
+            "bigdatacloud"
+          ],
+          "distanceM": 11
+        },
+        {
+          "oracles": [
+            "nominatim",
+            "geocode.maps.co"
+          ],
+          "distanceM": 11
+        },
+        {
+          "oracles": [
+            "nominatim",
+            "opencage"
+          ],
+          "distanceM": 15
+        },
+        {
+          "oracles": [
+            "bigdatacloud",
+            "geocode.maps.co"
+          ],
+          "distanceM": 15
+        },
+        {
+          "oracles": [
+            "bigdatacloud",
+            "opencage"
+          ],
+          "distanceM": 11
+        },
+        {
+          "oracles": [
+            "geocode.maps.co",
+            "opencage"
+          ],
+          "distanceM": 11
+        }
+      ]
+    },
+    {
+      "scenario": "SCENARIO 2 — Moderate agreement",
+      "description": "3 oracles agree, but 1 oracle is far outside the threshold (e.g. 50km away).",
+      "type": "synthetic",
+      "threshold": 100,
+      "successCount": 4,
+      "failureCount": 0,
+      "consensus": "verified",
+      "verified": true,
+      "expectedConsensus": "verified",
+      "pass": true,
+      "durationMs": 0,
+      "agreementPairsCount": 3,
+      "pairwiseDistances": [
+        {
+          "oracles": [
+            "nominatim",
+            "bigdatacloud"
+          ],
+          "distanceM": 11
+        },
+        {
+          "oracles": [
+            "nominatim",
+            "geocode.maps.co"
+          ],
+          "distanceM": 11
+        },
+        {
+          "oracles": [
+            "bigdatacloud",
+            "geocode.maps.co"
+          ],
+          "distanceM": 15
+        }
+      ]
+    },
+    {
+      "scenario": "SCENARIO 3 — Strong disagreement",
+      "description": "All oracles return points that are >1km away from each other.",
+      "type": "synthetic",
+      "threshold": 100,
+      "successCount": 4,
+      "failureCount": 0,
+      "consensus": "low_confidence",
+      "verified": false,
+      "expectedConsensus": "low_confidence",
+      "pass": true,
+      "durationMs": 0,
+      "agreementPairsCount": 0,
+      "pairwiseDistances": []
+    },
+    {
+      "scenario": "SCENARIO 4 — Missing/failing oracle",
+      "description": "1 oracle fails completely (network timeout). The remaining 3 agree.",
+      "type": "synthetic",
+      "threshold": 100,
+      "successCount": 3,
+      "failureCount": 1,
+      "consensus": "verified",
+      "verified": true,
+      "expectedConsensus": "verified",
+      "pass": true,
+      "durationMs": 0,
+      "agreementPairsCount": 3,
+      "pairwiseDistances": [
+        {
+          "oracles": [
+            "bigdatacloud",
+            "geocode.maps.co"
+          ],
+          "distanceM": 11
+        },
+        {
+          "oracles": [
+            "bigdatacloud",
+            "opencage"
+          ],
+          "distanceM": 11
+        },
+        {
+          "oracles": [
+            "geocode.maps.co",
+            "opencage"
+          ],
+          "distanceM": 15
+        }
+      ]
+    },
+    {
+      "scenario": "SCENARIO 5 — Multiple failures",
+      "description": "3 oracles fail, only 1 responds. Consensus cannot be reached.",
+      "type": "synthetic",
+      "threshold": 100,
+      "successCount": 1,
+      "failureCount": 3,
+      "consensus": "no_data",
+      "verified": false,
+      "expectedConsensus": "no_data",
+      "pass": true,
+      "durationMs": 0,
+      "agreementPairsCount": 0,
+      "pairwiseDistances": []
+    },
+    {
+      "scenario": "SCENARIO 6 — Boundary condition",
+      "description": "2 oracles respond with points exactly 101 meters apart (just over 100m threshold).",
+      "type": "synthetic",
+      "threshold": 100,
+      "successCount": 2,
+      "failureCount": 2,
+      "consensus": "low_confidence",
+      "verified": false,
+      "expectedConsensus": "low_confidence",
+      "pass": true,
+      "durationMs": 0,
+      "agreementPairsCount": 0,
+      "pairwiseDistances": []
+    }
+  ],
+  "liveApiLatency": [
+    {
+      "oracle": "Nominatim",
+      "latencyMs": 1089,
+      "success": true
+    },
+    {
+      "oracle": "BigDataCloud",
+      "latencyMs": 83,
+      "success": true
+    },
+    {
+      "oracle": "Geocode.Maps.co",
+      "latencyMs": 395,
+      "success": false,
+      "error": "Request failed with status code 401"
+    }
+  ]
+}

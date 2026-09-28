@@ -1,0 +1,17 @@
+ScenarioID,ScenarioName,Category,Distance_km,ElapsedTime_h,ImpliedSpeed_kmh,Threshold_kmh,ExpectedClassification,ActualClassification,Flagged,Status,Correct
+1,"Normal Farm-to-Lab Transport",LEGITIMATE,53.9323,2,26.9661,120,NORMAL,NORMAL,false,checked,PASS
+2,"Reasonable Truck Transit",LEGITIMATE,120.1523,2,60.0762,120,NORMAL,NORMAL,false,checked,PASS
+3,"Short Local Movement",LEGITIMATE,7.7836,0.5,15.5673,120,NORMAL,NORMAL,false,checked,PASS
+4,"Long Highway Journey",LEGITIMATE,217.0171,4,54.2543,120,NORMAL,NORMAL,false,checked,PASS
+5,"Inter-State Long Haul",LEGITIMATE,620.1352,10,62.0135,120,NORMAL,NORMAL,false,checked,PASS
+6,"High-Speed Highway Transit",LEGITIMATE,217.0171,2.2,98.6441,120,NORMAL,NORMAL,false,checked,PASS
+7,"Exact Threshold Boundary Case",LEGITIMATE,120.1523,1.0013,119.9921,120,NORMAL,NORMAL,false,checked,PASS
+8,"Moderate Speed Violation",SPOOFED,217.0171,1.2,180.8476,120,SPATIOTEMPORAL_ANOMALY,SPATIOTEMPORAL_ANOMALY,true,checked,PASS
+9,"Extreme Distance Spoofing",SPOOFED,1172.995,0.5,2345.9899,120,SPATIOTEMPORAL_ANOMALY,SPATIOTEMPORAL_ANOMALY,true,checked,PASS
+10,"Rapid Geographic Jump",SPOOFED,620.1352,0.1,6201.3518,120,SPATIOTEMPORAL_ANOMALY,SPATIOTEMPORAL_ANOMALY,true,checked,PASS
+11,"Flight-Speed Anomaly",SPOOFED,1172.995,1,1172.995,120,SPATIOTEMPORAL_ANOMALY,SPATIOTEMPORAL_ANOMALY,true,checked,PASS
+12,"Impossible Instantaneous Jump",SPOOFED,217.0171,0.05,4340.3413,120,SPATIOTEMPORAL_ANOMALY,SPATIOTEMPORAL_ANOMALY,true,checked,PASS
+13,"Missing GPS Coordinates",INVALID_INPUT,,,,120,INSUFFICIENT_DATA,INSUFFICIENT_DATA,false,insufficient_data,PASS
+14,"Missing Timestamp",INVALID_INPUT,,,,120,INSUFFICIENT_DATA,INSUFFICIENT_DATA,false,insufficient_data,PASS
+15,"Zero Time Gap (0 ms)",INVALID_INPUT,,0,,120,INSUFFICIENT_DATA,INSUFFICIENT_DATA,false,insufficient_data,PASS
+16,"Negative Time Gap (Timestamp Rollback)",INVALID_INPUT,,-2,,120,INSUFFICIENT_DATA,INSUFFICIENT_DATA,false,insufficient_data,PASS

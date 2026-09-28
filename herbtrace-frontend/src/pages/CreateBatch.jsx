@@ -1,9 +1,9 @@
 import { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  Leaf, GitBranch, Sprout, MapPin, Hash, Calendar, Scale,
-  Percent, CheckCircle, Plus, ImagePlus, ExternalLink,
-  AlertCircle, Loader,
+  Leaf, GitBranch, MapPin, Hash, Calendar, Scale,
+  CheckCircle, Plus, ImagePlus, ExternalLink,
+  Loader, Check, ShieldCheck, Layers,
 } from "lucide-react";
 import api from "../api";
 import GPSBar from "../components/GPSBar";
@@ -15,53 +15,29 @@ import Toast from "../components/Toast";
 //       gets a walletAddress field and wallet association is built into auth flow
 const FARMER_WALLET = "0xC490620E2c7fFCdB4A640dec73da6551062f2Fb8";
 
-function PreviewCard({ form, resolvedPlace }) {
-  if (!form.herbType) return (
-    <div style={{ padding: "28px 20px", textAlign: "center", color: "var(--text-muted)", fontSize: "0.85rem" }}>
-      <Leaf size={28} color="var(--border-glow)" style={{ marginBottom: 12, display: "block", margin: "0 auto 12px" }} />
-      Fill in the form to see a live preview
-    </div>
-  );
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 10, fontSize: "0.85rem" }}>
-      <div style={{ fontFamily: "var(--font-display)", fontSize: "1.1rem", fontWeight: 600 }}>{form.herbType || "\u2014"}</div>
-      {form.herbVariety   && <div style={{ color: "var(--text-secondary)" }}>{form.herbVariety}</div>}
-      <StatusPill status="CREATED" />
-      <div style={{ height: 1, background: "var(--border)", margin: "4px 0" }} />
-      {/* Show oracle-resolved place name instead of user-typed location */}
-      {resolvedPlace  && <div style={{ display: "flex", gap: 6, color: "var(--text-secondary)" }}><MapPin size={13} />{resolvedPlace}</div>}
-      {form.farmingMethod && <div style={{ display: "flex", gap: 6, color: "var(--text-secondary)" }}><Sprout size={13} />{form.farmingMethod}</div>}
-      {form.quantityKg    && <div style={{ display: "flex", gap: 6, color: "var(--text-secondary)" }}><Scale size={13} />{form.quantityKg} kg</div>}
-      {form.harvestDate   && <div style={{ display: "flex", gap: 6, color: "var(--text-secondary)" }}><Calendar size={13} />{new Date(form.harvestDate).toLocaleDateString("en-IN")}</div>}
-    </div>
-  );
-}
-
 export default function CreateBatch() {
   const navigate = useNavigate();
   const fileRef  = useRef();
 
-  const [coords, setCoords]       = useState(null);
-  // resolvedPlace is set by a quick client-side Nominatim call once GPS coords arrive.
-  // It's used for (a) the read-only location banner and (b) populating farmLocation on submit.
-  // Coordinates themselves are NEVER shown in the UI.
+  const [coords, setCoords]               = useState(null);
   const [resolvedPlace, setResolvedPlace] = useState(null);
   const [resolvingPlace, setResolvingPlace] = useState(false);
 
   const [form, setForm]         = useState({
-    herbType: "", herbVariety: "", farmingMethod: "",
-    lotNumber: "", harvestDate: "", quantityKg: "", estimatedMoisture: "", expectedDryWeight: "",
+    herbType: "",
+    herbVariety: "",
+    lotNumber: "",
+    harvestDate: "",
+    quantityKg: "",
   });
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError]           = useState(null);
+  const [submitting, setSubmitting]     = useState(false);
+  const [error, setError]               = useState(null);
   const [createdBatch, setCreatedBatch] = useState(null);
-  const [imageFile, setImageFile]   = useState(null);
-  const [imageUrl, setImageUrl]     = useState(null);
-  const [uploading, setUploading]   = useState(false);
-  const [toast, setToast]           = useState(null);
+  const [imageFile, setImageFile]       = useState(null);
+  const [imageUrl, setImageUrl]         = useState(null);
+  const [uploading, setUploading]       = useState(false);
+  const [toast, setToast]               = useState(null);
 
-  // Quick client-side reverse-geocode for display only.
-  // The actual multi-oracle verification still happens server-side on submit.
   const resolveFromCoords = async (c) => {
     if (!c) return;
     setResolvingPlace(true);
@@ -92,15 +68,16 @@ export default function CreateBatch() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!form.herbType || !form.farmingMethod || !form.harvestDate || !form.quantityKg) {
+    if (!form.herbType || !form.harvestDate || !form.quantityKg) {
       setError("Please fill in all required fields.");
       return;
     }
-    setSubmitting(true); setError(null);
+    setSubmitting(true);
+    setError(null);
+
     const batchId = `${form.herbType.toUpperCase().replace(/\s+/g, "")}-${Date.now()}`;
-    // farmLocation is populated from the oracle-resolved place name (not user-typed)
-    // If GPS wasn't available, send empty string — backend handles it gracefully
     const farmLocation = resolvedPlace || "";
+
     try {
       const res = await api.post("/batch", {
         ...form,
@@ -138,14 +115,35 @@ export default function CreateBatch() {
   };
 
   const resetForm = () => {
-    setCreatedBatch(null); setForm({ herbType: "", herbVariety: "", farmingMethod: "",
-      lotNumber: "", harvestDate: "", quantityKg: "",
-      estimatedMoisture: "", expectedDryWeight: "" });
-    setError(null); setImageFile(null); setImageUrl(null);
+    setCreatedBatch(null);
+    setForm({
+      herbType: "",
+      herbVariety: "",
+      lotNumber: "",
+      harvestDate: "",
+      quantityKg: "",
+    });
+    setError(null);
+    setImageFile(null);
+    setImageUrl(null);
   };
 
   return (
-    <div style={{ maxWidth: 900, margin: "0 auto" }}>
+    <div style={{ maxWidth: 960, margin: "0 auto", padding: "0 12px" }}>
+      <style>{`
+        .create-batch-grid {
+          display: grid;
+          grid-template-columns: 1fr 340px;
+          gap: 20px;
+          align-items: start;
+        }
+        @media (max-width: 900px) {
+          .create-batch-grid {
+            grid-template-columns: 1fr;
+          }
+        }
+      `}</style>
+
       {toast && <Toast message={toast.message} type={toast.type} onDone={() => setToast(null)} />}
 
       <div style={{ marginBottom: 24 }}>
@@ -154,25 +152,6 @@ export default function CreateBatch() {
           Record a new herb harvest on-chain. All fields marked with * are required.
         </p>
       </div>
-
-      <GPSBar onCoordsChange={handleCoordsChange} />
-
-      {/* Read-only location banner — shown once oracle resolves a place name */}
-      {(resolvingPlace || resolvedPlace) && (
-        <div style={{
-          display: "flex", alignItems: "center", gap: 8,
-          padding: "10px 16px", borderRadius: 10, marginBottom: 20,
-          background: resolvedPlace ? "var(--fern-dim)" : "rgba(255,255,255,0.02)",
-          border: `1px solid ${resolvedPlace ? "var(--border-glow)" : "var(--border)"}`,
-          fontSize: "0.85rem",
-        }}>
-          <MapPin size={14} color="var(--fern)" />
-          {resolvingPlace
-            ? <span style={{ color: "var(--text-muted)" }}>Resolving location…</span>
-            : <span>Detected location: <strong style={{ color: "var(--text-primary)" }}>{resolvedPlace}</strong></span>
-          }
-        </div>
-      )}
 
       {createdBatch ? (
         /* ── Success Card ── */
@@ -224,81 +203,207 @@ export default function CreateBatch() {
           </div>
         </div>
       ) : (
-        /* ── Two-column form ── */
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 340px", gap: 20, alignItems: "start" }}>
+        /* ── Two-column layout ── */
+        <div className="create-batch-grid">
+          {/* LEFT COLUMN: Simplified Create Batch Form */}
           <form onSubmit={handleSubmit} className="glass-card" style={{ padding: "28px 28px" }}>
-            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
 
+              {/* Herb Type * */}
               <div className="field-group">
                 <label className="field-label"><Leaf size={14} /> Herb Type *</label>
-                <input className="field-input" type="text" placeholder="e.g. Ashwagandha" required {...field("herbType")} />
+                <input className="field-input" type="text" placeholder="e.g. Tulsi" required {...field("herbType")} />
               </div>
 
+              {/* Herb Variety / Cultivar (optional) */}
               <div className="field-group">
                 <label className="field-label"><GitBranch size={14} /> Herb Variety / Cultivar</label>
-                <input className="field-input" type="text" placeholder="e.g. KS-100, KSM-66" {...field("herbVariety")} />
+                <input className="field-input" type="text" placeholder="e.g. KSM-66" {...field("herbVariety")} />
               </div>
 
-              <div className="field-group">
-                <label className="field-label"><Sprout size={14} /> Farming Method *</label>
-                <select className="field-select" required {...field("farmingMethod")}>
-                  <option value="">Select method…</option>
-                  <option>Organic</option>
-                  <option>Conventional</option>
-                  <option>Biodynamic</option>
-                  <option>Wildcrafted</option>
-                </select>
-              </div>
-
-              {/* Farm Location is now captured automatically via GPS + oracle.
-                  The read-only banner at the top of the page shows the resolved name.
-                  No manual input field — location is never user-editable. */}
-
+              {/* Lot / Field Number (optional) */}
               <div className="field-group">
                 <label className="field-label"><Hash size={14} /> Lot / Field Number</label>
                 <input className="field-input" type="text" placeholder="e.g. FIELD-A3" {...field("lotNumber")} />
               </div>
 
-              <div className="field-group">
-                <label className="field-label"><Calendar size={14} /> Harvest Date *</label>
-                <input className="field-input" type="date" required {...field("harvestDate")} />
-              </div>
-
+              {/* Harvest Date * & Quantity (kg) * */}
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+                <div className="field-group">
+                  <label className="field-label"><Calendar size={14} /> Harvest Date *</label>
+                  <input className="field-input" type="date" required {...field("harvestDate")} />
+                </div>
                 <div className="field-group">
                   <label className="field-label"><Scale size={14} /> Quantity (kg) *</label>
                   <input className="field-input" type="number" min="0.1" step="0.1" required
                     placeholder="e.g. 250" {...field("quantityKg")} />
                 </div>
-                <div className="field-group">
-                  <label className="field-label"><Percent size={14} /> Est. Moisture (%)</label>
-                  <input className="field-input" type="number" min="0" max="100" step="0.1"
-                    placeholder="e.g. 12" {...field("estimatedMoisture")} />
-                </div>
               </div>
 
-              <div className="field-group">
-                <label className="field-label"><Scale size={14} /> Expected Dry Weight (kg)</label>
-                <input className="field-input" type="number" min="0.1" step="0.1"
-                  placeholder="e.g. 200" {...field("expectedDryWeight")} />
+              {/* Location Section */}
+              <div style={{
+                padding: "16px", borderRadius: 14,
+                background: "var(--fern-dim)", border: "1px solid var(--border-glow)",
+                display: "flex", flexDirection: "column", gap: 8
+              }}>
+                <div style={{
+                  fontSize: "0.75rem", fontWeight: 700, letterSpacing: "0.06em",
+                  color: "var(--fern)", textTransform: "uppercase", display: "flex", alignItems: "center", gap: 6
+                }}>
+                  <MapPin size={14} /> FARM LOCATION
+                </div>
+
+                <GPSBar onCoordsChange={handleCoordsChange} />
+
+                <div style={{ fontSize: "0.85rem", color: "var(--text-primary)", fontWeight: 500 }}>
+                  {resolvingPlace ? (
+                    <span style={{ color: "var(--text-muted)" }}>Resolving location details…</span>
+                  ) : resolvedPlace ? (
+                    <span>📍 Location: <strong style={{ color: "var(--text-primary)" }}>{resolvedPlace}</strong></span>
+                  ) : (
+                    <span>📍 Location will be captured automatically</span>
+                  )}
+                </div>
+                <div style={{ fontSize: "0.78rem", color: "var(--text-secondary)" }}>
+                  {coords ? "Ready for location verification" : "GPS coordinates captured silently on browser consent"}
+                </div>
               </div>
 
               <ErrorCard error={error} />
 
-              <button type="submit" className="btn-primary" disabled={submitting}>
+              <button type="submit" className="btn-primary" disabled={submitting} style={{ marginTop: 6, justifyContent: "center" }}>
                 {submitting ? <Loader size={16} className="spin" /> : <CheckCircle size={16} />}
                 {submitting ? "Creating on-chain…" : "Create Batch"}
               </button>
             </div>
           </form>
 
-          {/* Live Preview */}
-          <div className="glass-card" style={{ padding: "22px 20px", position: "sticky", top: 80 }}>
-            <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", letterSpacing: "0.06em",
-              textTransform: "uppercase", fontWeight: 600, marginBottom: 14, display: "flex", gap: 6 }}>
-              <AlertCircle size={12} /> Live Preview
+          {/* RIGHT COLUMN: Informational Cards */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+            {/* CARD 1 — TRACEABILITY JOURNEY */}
+            <div className="glass-card" style={{ padding: "24px 22px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
+                <div style={{ padding: 6, borderRadius: 8, background: "var(--fern-dim)", color: "var(--fern)", display: "flex" }}>
+                  <Layers size={18} />
+                </div>
+                <h3 style={{ fontFamily: "var(--font-display)", fontSize: "1.05rem", fontWeight: 600, letterSpacing: "0.02em" }}>
+                  TRACEABILITY JOURNEY
+                </h3>
+              </div>
+              <p style={{ color: "var(--text-secondary)", fontSize: "0.82rem", marginBottom: 20, marginTop: 4 }}>
+                Track the batch through every supply-chain stage.
+              </p>
+
+              {/* Vertical Timeline */}
+              <div style={{ display: "flex", flexDirection: "column", gap: 0, paddingLeft: 4 }}>
+                {/* Stage 1: CREATE (Active) */}
+                <div style={{ display: "flex", gap: 14 }}>
+                  <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+                    <div style={{
+                      width: 16, height: 16, borderRadius: "50%",
+                      background: "var(--fern)", border: "3px solid var(--bg-secondary)",
+                      boxShadow: "0 0 10px var(--fern)", zIndex: 2
+                    }} />
+                    <div style={{ width: 2, flexGrow: 1, background: "var(--border-glow)", marginTop: 2, marginBottom: 2, minHeight: 28 }} />
+                  </div>
+                  <div style={{ paddingBottom: 16 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <span style={{ fontWeight: 600, fontSize: "0.88rem", color: "var(--fern)" }}>CREATE</span>
+                      <span style={{ fontSize: "0.68rem", padding: "2px 8px", borderRadius: 10, background: "var(--fern-dim)", color: "var(--fern)", fontWeight: 600 }}>Active</span>
+                    </div>
+                    <div style={{ fontSize: "0.8rem", color: "var(--text-secondary)", marginTop: 2 }}>Batch origin registered</div>
+                  </div>
+                </div>
+
+                {/* Stage 2: LAB TEST */}
+                <div style={{ display: "flex", gap: 14 }}>
+                  <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+                    <div style={{
+                      width: 14, height: 14, borderRadius: "50%",
+                      background: "transparent", border: "2px solid var(--text-muted)",
+                      zIndex: 2, marginTop: 1
+                    }} />
+                    <div style={{ width: 2, flexGrow: 1, background: "var(--border)", marginTop: 2, marginBottom: 2, minHeight: 28 }} />
+                  </div>
+                  <div style={{ paddingBottom: 16 }}>
+                    <div style={{ fontWeight: 600, fontSize: "0.88rem", color: "var(--text-muted)" }}>LAB TEST</div>
+                    <div style={{ fontSize: "0.8rem", color: "var(--text-muted)", marginTop: 2 }}>Quality information recorded</div>
+                  </div>
+                </div>
+
+                {/* Stage 3: PROCESS */}
+                <div style={{ display: "flex", gap: 14 }}>
+                  <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+                    <div style={{
+                      width: 14, height: 14, borderRadius: "50%",
+                      background: "transparent", border: "2px solid var(--text-muted)",
+                      zIndex: 2, marginTop: 1
+                    }} />
+                    <div style={{ width: 2, flexGrow: 1, background: "var(--border)", marginTop: 2, marginBottom: 2, minHeight: 28 }} />
+                  </div>
+                  <div style={{ paddingBottom: 16 }}>
+                    <div style={{ fontWeight: 600, fontSize: "0.88rem", color: "var(--text-muted)" }}>PROCESS</div>
+                    <div style={{ fontSize: "0.8rem", color: "var(--text-muted)", marginTop: 2 }}>Transformation and lineage recorded</div>
+                  </div>
+                </div>
+
+                {/* Stage 4: TRANSFER */}
+                <div style={{ display: "flex", gap: 14 }}>
+                  <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+                    <div style={{
+                      width: 14, height: 14, borderRadius: "50%",
+                      background: "transparent", border: "2px solid var(--text-muted)",
+                      zIndex: 2, marginTop: 1
+                    }} />
+                  </div>
+                  <div>
+                    <div style={{ fontWeight: 600, fontSize: "0.88rem", color: "var(--text-muted)" }}>TRANSFER</div>
+                    <div style={{ fontSize: "0.8rem", color: "var(--text-muted)", marginTop: 2 }}>Custody and final verification recorded</div>
+                  </div>
+                </div>
+              </div>
             </div>
-            <PreviewCard form={form} resolvedPlace={resolvedPlace} />
+
+            {/* CARD 2 — BLOCKCHAIN PROTECTION */}
+            <div className="glass-card" style={{ padding: "24px 22px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+                <div style={{ padding: 6, borderRadius: 8, background: "var(--fern-dim)", color: "var(--fern)", display: "flex" }}>
+                  <ShieldCheck size={18} />
+                </div>
+                <h3 style={{ fontFamily: "var(--font-display)", fontSize: "1.05rem", fontWeight: 600, letterSpacing: "0.02em" }}>
+                  BLOCKCHAIN PROTECTION
+                </h3>
+              </div>
+
+              <ul style={{ listStyle: "none", padding: 0, margin: "0 0 20px 0", display: "flex", flexDirection: "column", gap: 10 }}>
+                {[
+                  "Batch identity",
+                  "Origin information",
+                  "GPS-based location verification",
+                  "Cryptographic integrity",
+                  "Traceable batch lineage",
+                ].map((item, idx) => (
+                  <li key={idx} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: "0.85rem", color: "var(--text-secondary)" }}>
+                    <div style={{
+                      width: 18, height: 18, borderRadius: "50%",
+                      background: "var(--fern-dim)", color: "var(--fern)",
+                      display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0
+                    }}>
+                      <Check size={12} strokeWidth={3} />
+                    </div>
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ul>
+
+              <div style={{
+                padding: "12px 14px", borderRadius: 10,
+                background: "rgba(255,255,255,0.02)", border: "1px solid var(--border)",
+                fontSize: "0.8rem", color: "var(--text-muted)", textAlign: "center", lineHeight: "1.4"
+              }}>
+                Your batch will enter the supply chain as the <strong style={{ color: "var(--fern)" }}>CREATED</strong> stage.
+              </div>
+            </div>
           </div>
         </div>
       )}

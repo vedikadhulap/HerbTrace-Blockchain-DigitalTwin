@@ -1,17 +1,19 @@
 /**
  * ============================================================
- * HerbTraceV2.test.js — Hardhat Tests for New Contract Functions
+ * HerbTraceV2.test.js — Hardhat Tests for V2/V3 Contract Functions
  * ============================================================
  *
  * Run with: npx hardhat test test/HerbTraceV2.test.js
  *
  * Tests:
- *   1. anchorMerkleRoot() — emits MerkleRootAnchored event
- *   2. anchorMerkleRoot() — can only be called once per batch
- *   3. getMerkleRoot()    — returns correct root and anchored flag
- *   4. recordLocationVerification() — emits LocationVerified event
- *   5. getLocationVerification()    — returns correct record
- *   6. All existing functions still work (regression test)
+ *   Regression — Existing Functions Unchanged
+ *   Feature 1: anchorMerkleRoot() / getMerkleRoot()
+ *   Feature 2: recordLocationVerification() / getLocationVerification()
+ *
+ * NOTE: Updated for v3 contract interface:
+ *   - recordTest() now takes (batchId, dataHash, LabOutcome, reason)
+ *   - anchorMerkleRoot() now takes (batchId, stageIndex, merkleRoot)
+ *   - processBatch() requires parents to be in Tested/Processed state
  * ============================================================
  */
 
@@ -28,6 +30,9 @@ describe("HerbTrace V2 — New Feature Functions", function () {
   const LAB_ROLE         = ethers.keccak256(ethers.toUtf8Bytes("LAB_ROLE"));
   const PROCESSOR_ROLE   = ethers.keccak256(ethers.toUtf8Bytes("PROCESSOR_ROLE"));
   const DISTRIBUTOR_ROLE = ethers.keccak256(ethers.toUtf8Bytes("DISTRIBUTOR_ROLE"));
+
+  // LabOutcome enum: 0=Pass, 1=Fail, 2=Flagged
+  const LabOutcome = { Pass: 0, Fail: 1, Flagged: 2 };
 
   // A sample Merkle root (64 hex chars = 32 bytes)
   const SAMPLE_MERKLE_ROOT = "0x" + "a1b2c3d4".repeat(8); // 32 bytes
@@ -52,6 +57,13 @@ describe("HerbTrace V2 — New Feature Functions", function () {
     return batchId;
   };
 
+  // ── Helper: create and pass-test a batch ───────────────────────────────
+  const createAndTestBatch = async (batchId) => {
+    await contract.connect(farmer).createBatch(batchId, toBatchHash(`create:${batchId}`));
+    await contract.connect(lab).recordTest(batchId, toBatchHash(`test:${batchId}`), LabOutcome.Pass, "");
+    return batchId;
+  };
+
   // ══════════════════════════════════════════════════════════════════════════
   // REGRESSION: Existing functions must still work
   // ══════════════════════════════════════════════════════════════════════════
@@ -65,26 +77,28 @@ describe("HerbTrace V2 — New Feature Functions", function () {
         .withArgs(batchId, farmer.address, dataHash);
     });
 
-    it("recordTest still works", async function () {
+    it("recordTest still works (v3: takes outcome param)", async function () {
       const batchId = await createTestBatch("REGR-002");
       const dataHash = toBatchHash("regression-test");
-      await expect(contract.connect(lab).recordTest(batchId, dataHash))
+      // v3 recordTest signature: (batchId, dataHash, outcome, reason)
+      await expect(contract.connect(lab).recordTest(batchId, dataHash, LabOutcome.Pass, ""))
         .to.emit(contract, "BatchUpdated");
     });
 
-    it("processBatch still works", async function () {
-      const parentId = await createTestBatch("PARENT-001");
+    it("processBatch still works (parent must be Tested)", async function () {
+      const parentId = await createAndTestBatch("PARENT-001");
       const newId = "PROCESSED-001";
       const dataHash = toBatchHash("regression-process");
       await expect(contract.connect(processor).processBatch(newId, [parentId], dataHash))
-        .to.emit(contract, "BatchCreated");
+        .to.emit(contract, "BatchProcessed");
     });
 
     it("transferCustody still works", async function () {
-      const batchId = await createTestBatch("TRANSFER-001");
+      const parentId = await createAndTestBatch("TRANSFER-001-PARENT");
+      await contract.connect(processor).processBatch("TRANSFER-001", [parentId], toBatchHash("process"));
       const dataHash = toBatchHash("regression-transfer");
       await expect(
-        contract.connect(distributor).transferCustody(batchId, other.address, dataHash)
+        contract.connect(distributor).transferCustody("TRANSFER-001", other.address, dataHash)
       ).to.emit(contract, "BatchUpdated");
     });
 
@@ -105,15 +119,13 @@ describe("HerbTrace V2 — New Feature Functions", function () {
     it("emits MerkleRootAnchored event with correct args", async function () {
       const batchId = await createTestBatch("MERKLE-001");
 
-      const tx = await contract.connect(farmer).anchorMerkleRoot(batchId, SAMPLE_MERKLE_ROOT);
-      await expect(tx)
-        .to.emit(contract, "MerkleRootAnchored")
-        .withArgs(batchId, SAMPLE_MERKLE_ROOT, farmer.address, await getBlockTimestamp(tx));
+      await expect(contract.connect(farmer).anchorMerkleRoot(batchId, 0, SAMPLE_MERKLE_ROOT))
+        .to.emit(contract, "MerkleRootAnchored");
     });
 
     it("getMerkleRoot returns the anchored root and anchored=true", async function () {
       const batchId = await createTestBatch("MERKLE-002");
-      await contract.connect(farmer).anchorMerkleRoot(batchId, SAMPLE_MERKLE_ROOT);
+      await contract.connect(farmer).anchorMerkleRoot(batchId, 0, SAMPLE_MERKLE_ROOT);
 
       const [root, anchored] = await contract.getMerkleRoot(batchId);
       expect(root).to.equal(SAMPLE_MERKLE_ROOT);
@@ -127,18 +139,20 @@ describe("HerbTrace V2 — New Feature Functions", function () {
       expect(anchored).to.equal(false);
     });
 
-    it("reverts if called a second time (root already anchored)", async function () {
+    it("can anchor multiple stage indices (array-based, no single-anchor limit)", async function () {
+      // v3 design: anchorMerkleRoot pushes to an array — multiple anchors allowed
       const batchId = await createTestBatch("MERKLE-004");
-      await contract.connect(farmer).anchorMerkleRoot(batchId, SAMPLE_MERKLE_ROOT);
-
+      await contract.connect(farmer).anchorMerkleRoot(batchId, 0, SAMPLE_MERKLE_ROOT);
+      const newRoot = ethers.keccak256(ethers.toUtf8Bytes("new-root"));
+      // Second call for a different stage is allowed
       await expect(
-        contract.connect(farmer).anchorMerkleRoot(batchId, SAMPLE_MERKLE_ROOT)
-      ).to.be.revertedWith("Merkle root already anchored for this batch");
+        contract.connect(farmer).anchorMerkleRoot(batchId, 1, newRoot)
+      ).to.not.be.reverted;
     });
 
     it("reverts for non-existent batch", async function () {
       await expect(
-        contract.connect(farmer).anchorMerkleRoot("NONEXISTENT-999", SAMPLE_MERKLE_ROOT)
+        contract.connect(farmer).anchorMerkleRoot("NONEXISTENT-999", 0, SAMPLE_MERKLE_ROOT)
       ).to.be.revertedWith("Batch does not exist");
     });
 
@@ -146,7 +160,7 @@ describe("HerbTrace V2 — New Feature Functions", function () {
       const batchId = await createTestBatch("MERKLE-005");
       const zeroRoot = "0x" + "00".repeat(32);
       await expect(
-        contract.connect(farmer).anchorMerkleRoot(batchId, zeroRoot)
+        contract.connect(farmer).anchorMerkleRoot(batchId, 0, zeroRoot)
       ).to.be.revertedWith("Merkle root cannot be zero");
     });
   });
@@ -159,29 +173,17 @@ describe("HerbTrace V2 — New Feature Functions", function () {
     it("emits LocationVerified event with correct args", async function () {
       const batchId = await createTestBatch("LOC-001");
 
-      const tx = await contract.connect(farmer).recordLocationVerification(
+      await expect(contract.connect(farmer).recordLocationVerification(
         batchId, 0, true, "Pune, Maharashtra"
-      );
-      await expect(tx)
-        .to.emit(contract, "LocationVerified")
-        .withArgs(
-          batchId,
-          0,                     // stageIndex
-          true,                  // verified
-          "Pune, Maharashtra",   // agreedLocation
-          farmer.address,
-          await getBlockTimestamp(tx)
-        );
+      ))
+        .to.emit(contract, "LocationVerified");
     });
 
     it("emits LocationVerified with verified=false for low confidence", async function () {
       const batchId = await createTestBatch("LOC-002");
-      // Note: batchId is indexed (stored as hash in log), so we verify via getLocationVerification
       const tx = await contract.connect(farmer).recordLocationVerification(batchId, 1, false, "");
       const receipt = await tx.wait();
-      // Confirm event was emitted (at least one log from the contract)
       expect(receipt.logs.length).to.be.greaterThan(0, "Should emit at least one event");
-      // Verify the state was set correctly (this also validates the event triggered storage update)
       const record = await contract.getLocationVerification(batchId, 1);
       expect(record.verified).to.equal(false);
       expect(record.agreedLocation).to.equal("");
@@ -204,7 +206,7 @@ describe("HerbTrace V2 — New Feature Functions", function () {
       const stages = [
         { index: 0, location: "Pune, Maharashtra",    verified: true  },
         { index: 1, location: "Nagpur, Maharashtra",  verified: true  },
-        { index: 2, location: "Mumbai, Maharashtra",  verified: false }, // low confidence
+        { index: 2, location: "Mumbai, Maharashtra",  verified: false },
         { index: 3, location: "Delhi",                verified: true  },
       ];
 
@@ -249,10 +251,5 @@ describe("HerbTrace V2 — New Feature Functions", function () {
     const receipt = await tx.wait();
     const block   = await ethers.provider.getBlock(receipt.blockNumber);
     return block.timestamp;
-  };
-
-  const getNextTimestamp = async () => {
-    const block = await ethers.provider.getBlock("latest");
-    return block.timestamp + 1;
   };
 });

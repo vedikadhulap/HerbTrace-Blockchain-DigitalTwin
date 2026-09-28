@@ -1,6 +1,7 @@
 const { ethers } = require("ethers");
 const Batch = require("../models/Batch");
 const { getContract } = require("./blockchainService");
+const { recallBatchWithLineage, isBatchRecalled, getLineage } = require("./recallService");
 const contract = getContract("farmer");
 
 // ─── Feature flags (read once at startup) ────────────────────────────────────
@@ -324,8 +325,15 @@ const createBatch = async (data) => {
   });
   const dataHash = ethers.keccak256(ethers.toUtf8Bytes(dataString));
 
-  const tx = await contract.createBatch(batchId, dataHash);
-  const receipt = await tx.wait();
+  let txHash = null;
+  try {
+    const tx = await contract.createBatch(batchId, dataHash);
+    if (tx && tx.hash) txHash = tx.hash;
+    const receipt = await tx.wait();
+    if (receipt && receipt.hash) txHash = receipt.hash;
+  } catch (contractErr) {
+    console.warn(`[createBatch] On-chain warning for ${batchId}: ${contractErr.message}. Proceeding with off-chain creation.`);
+  }
 
   // chainId = batchId for a brand-new raw batch (it starts its own chain)
   const chainId = batchId;
@@ -336,7 +344,7 @@ const createBatch = async (data) => {
     farmerWallet, farmLocation,
     location: { latitude, longitude },
     harvestDate, quantityKg, expectedDryWeight,
-    dataHash, txHash: receipt.hash, status: "CREATED",
+    dataHash, txHash, status: "CREATED",
     createdBy: data.userId,
   });
 
@@ -355,46 +363,111 @@ const createBatch = async (data) => {
 
 const getBatchById = async (batchId) => {
   const batch = await Batch.findOne({ batchId });
-  return batch;
+  if (!batch) return null;
+
+  // Stale state reconciliation check: ensure on-chain failure state overrides stale MongoDB TESTED
+  try {
+    const { fetchOnChainBatch } = require("./reconciliationService");
+    const onChain = await fetchOnChainBatch(batchId);
+    const BLOCKED_CHAIN = ['TEST_FAILED', 'QUARANTINED', 'RECALLED'];
+    if (onChain.ok && onChain.data) {
+      const chainStatus = onChain.data.statusName;
+      if (BLOCKED_CHAIN.includes(chainStatus) && batch.status !== chainStatus) {
+        batch.status = chainStatus;
+        await batch.save();
+      }
+    }
+  } catch (e) {}
+
+  const BLOCKED_STATUSES = ['TEST_FAILED', 'QUARANTINED', 'RECALLED'];
+  const obj = batch.toObject ? batch.toObject() : batch;
+  obj.processingAllowed = !BLOCKED_STATUSES.includes(obj.status) && (obj.status === 'TESTED' || obj.status === 'PROCESSED');
+  obj.transferAllowed = !BLOCKED_STATUSES.includes(obj.status) && obj.status !== 'CREATED';
+  return obj;
 };
 
 const recordLabTest = async (data) => {
-  const { batchId, testResults, labWallet, latitude, longitude, userId } = data;
+  const { batchId, testResults, labWallet, latitude, longitude, userId, labOutcome, labFailReason } = data;
 
   const existingBatch = await Batch.findOne({ batchId });
   if (!existingBatch) throw new Error("Batch not found");
+  if (existingBatch.status !== 'CREATED') throw new Error(`Batch must be in CREATED state to record lab test (current: ${existingBatch.status})`);
+
+  let resolvedOutcome = labOutcome;
+  let resolvedReason = labFailReason;
+
+  if (!resolvedOutcome && testResults) {
+    try {
+      const parsed = typeof testResults === 'string' ? JSON.parse(testResults) : testResults;
+      if (parsed.overallResult) {
+        resolvedOutcome = parsed.overallResult;
+      } else if (parsed.passed === false) {
+        resolvedOutcome = 'FAIL';
+      } else if (parsed.passed === true) {
+        resolvedOutcome = 'PASS';
+      }
+      if (!resolvedReason) {
+        resolvedReason = parsed.labFailReason || parsed.additionalNotes || (resolvedOutcome === 'FAIL' ? 'Lab test failed quality criteria' : '');
+      }
+    } catch (e) {}
+  }
+  if (!resolvedOutcome && data.passed === false) {
+    resolvedOutcome = 'FAIL';
+  }
+
+  // ── Validate labOutcome ───────────────────────────────────────────────────
+  const VALID_OUTCOMES = ['PASS', 'FAIL', 'FLAGGED'];
+  const outcome = (resolvedOutcome || 'PASS').toUpperCase();
+  const failReason = resolvedReason || (outcome === 'FAIL' ? 'Lab test failed quality standards' : '');
+  if (!VALID_OUTCOMES.includes(outcome)) {
+    throw new Error(`Invalid lab outcome "${labOutcome}". Must be one of: PASS, FAIL, FLAGGED`);
+  }
 
   // ── Feature 2: Resolve GPS → human-readable place name (non-blocking) ──────
-  // resolveLocationOnly() calls the 3 oracles to translate lat/lng into a city name.
-  // It never throws — if all oracles fail, agreedLocation is just null.
   const agreedLocation = await resolveLocationOnly(latitude, longitude, batchId, "TEST");
 
-  const dataString = JSON.stringify({ batchId, testResults, labWallet, latitude, longitude });
+  const dataString = JSON.stringify({ batchId, testResults, labWallet, latitude, longitude, labOutcome: outcome });
   const dataHash = ethers.keccak256(ethers.toUtf8Bytes(dataString));
 
-  const labContract = getContract("lab");
-  const tx = await labContract.recordTest(batchId, dataHash);
-  const receipt = await tx.wait();
+  // ── On-chain: pass the outcome to recordTest ──────────────────────────────
+  // LabOutcome enum: 0=Pass, 1=Fail, 2=Flagged
+  const OUTCOME_INDEX = { PASS: 0, FAIL: 1, FLAGGED: 2 };
+  let txHash = null;
+  try {
+    const labContract = getContract("lab");
+    const tx = await labContract.recordTest(
+      batchId,
+      dataHash,
+      OUTCOME_INDEX[outcome],
+      failReason || ''
+    );
+    if (tx && tx.hash) txHash = tx.hash;
+    const receipt = await tx.wait();
+    if (receipt && receipt.hash) txHash = receipt.hash;
+  } catch (contractErr) {
+    console.warn(`[LabTest] On-chain recordTest warning for ${batchId}: ${contractErr.message}. Proceeding with off-chain state update.`);
+  }
 
-  existingBatch.status    = "TESTED";
-  existingBatch.dataHash  = dataHash;
-  existingBatch.txHash    = receipt.hash;
-  existingBatch.labData   = JSON.parse(testResults);
+  // ── MongoDB update ────────────────────────────────────────────────────────
+  const newStatus = outcome === 'FAIL' ? 'TEST_FAILED' : 'TESTED';
+  existingBatch.status     = newStatus;
+  existingBatch.dataHash   = dataHash;
+  existingBatch.txHash     = txHash;
+  existingBatch.labData    = typeof testResults === 'string' ? JSON.parse(testResults) : testResults;
   existingBatch.labLocation = { latitude, longitude };
+  existingBatch.labOutcome  = outcome;
+  if (outcome === 'FAIL') existingBatch.labFailReason = failReason;
   if (userId) existingBatch.testedBy = userId;
   await existingBatch.save();
 
   // ── Feature 1: Record Leaf 1 (TEST stage) — use this batch's chainId ──────
   if (MERKLE_ENABLED) {
     const { buildLeafData, STAGE } = getMerkleService();
-    // chainId fallback: old batches without chainId use their own batchId
     const chainId = existingBatch.chainId || batchId;
     const leafStr = buildLeafData("TEST", { batchId, testResults, labWallet, latitude, longitude });
     await updateMerkleLeaf(chainId, STAGE.TEST, leafStr);
   }
 
-  // Return both the batch document AND the resolved place name so the
-  // controller can include agreedLocation in the API response
   return { batch: existingBatch, agreedLocation };
 };
 
@@ -404,6 +477,54 @@ const processBatch = async (data) => {
   const parents = await Batch.find({ batchId: { $in: parentBatchIds } });
   if (parents.length !== parentBatchIds.length) {
     throw new Error("One or more parent batches not found");
+  }
+
+  // ── Guard: ALL parents must be in a valid processing state (TESTED / PROCESSED) ──────
+  const BLOCKED_STATUSES = ['TEST_FAILED', 'QUARANTINED', 'RECALLED'];
+  const blockedParents = [];
+
+  for (const parentId of parentBatchIds) {
+    const parent = parents.find((p) => p.batchId === parentId);
+    let mongoStatus = parent ? parent.status : 'NOT_FOUND';
+    let chainStatus = null;
+    let reason = parent ? (parent.labFailReason || parent.quarantineReason || parent.recallReason || '') : 'Batch not found in database';
+
+    // Stale state reconciliation check: fetch on-chain state (Section 7)
+    try {
+      const { fetchOnChainBatch } = require("./reconciliationService");
+      const onChain = await fetchOnChainBatch(parentId);
+      if (onChain.ok && onChain.data) {
+        chainStatus = onChain.data.statusName;
+      }
+    } catch (e) {}
+
+    console.log(`[DEBUG processBatch] parentId=${parentId} mongoStatus=${mongoStatus} chainStatus=${chainStatus}`);
+
+    // Section 7 Rule: If EITHER MongoDB OR Blockchain reports a failure/blocked status, BLOCK PROCESSING!
+    const BLOCKED_CHAIN = ['TEST_FAILED', 'QUARANTINED', 'RECALLED', 'TestFailed', 'Quarantined', 'Recalled'];
+    const mongoBlocked = BLOCKED_STATUSES.includes(mongoStatus) || (mongoStatus !== 'TESTED' && mongoStatus !== 'PROCESSED');
+    const chainBlocked = chainStatus && BLOCKED_CHAIN.includes(chainStatus);
+    const isBlocked = mongoBlocked || chainBlocked;
+    const effectiveStatus = BLOCKED_STATUSES.includes(mongoStatus) ? mongoStatus : (chainBlocked ? chainStatus : mongoStatus);
+
+    if (isBlocked) {
+      blockedParents.push({
+        batchId: parentId,
+        status: effectiveStatus,
+        reason: reason || `Batch ${parentId} is in ${effectiveStatus} state which cannot be processed.`,
+      });
+    }
+  }
+
+  if (blockedParents.length > 0) {
+    const first = blockedParents[0];
+    const err = new Error(`Batch ${first.batchId} cannot be processed because its status is ${first.status}.`);
+    err.name = "PROCESSING_BLOCKED";
+    err.batchId = first.batchId;
+    err.status = first.status;
+    err.reason = first.reason;
+    err.blockedParents = blockedParents;
+    throw err;
   }
 
   // ── Feature 2: Resolve GPS → human-readable place name (non-blocking) ──────
@@ -417,9 +538,16 @@ const processBatch = async (data) => {
   const dataString = JSON.stringify({ newBatchId, parentBatchIds, processorNotes, latitude, longitude });
   const dataHash = ethers.keccak256(ethers.toUtf8Bytes(dataString));
 
-  const processorContract = getContract("processor");
-  const tx = await processorContract.processBatch(newBatchId, parentBatchIds, dataHash);
-  const receipt = await tx.wait();
+  let txHash = null;
+  try {
+    const processorContract = getContract("processor");
+    const tx = await processorContract.processBatch(newBatchId, parentBatchIds, dataHash);
+    if (tx && tx.hash) txHash = tx.hash;
+    const receipt = await tx.wait();
+    if (receipt && receipt.hash) txHash = receipt.hash;
+  } catch (contractErr) {
+    console.warn(`[processBatch] On-chain processBatch warning for ${newBatchId}: ${contractErr.message}. Proceeding with off-chain state update.`);
+  }
 
   const newBatch = await Batch.create({
     batchId:         newBatchId,
@@ -427,10 +555,10 @@ const processBatch = async (data) => {
     herbType:        parents[0].herbType,
     farmerWallet:    parents[0].farmerWallet,
     dataHash,
-    txHash:          receipt.hash,
+    txHash,
     status:          "PROCESSED",
     parentBatchIds,
-    processorData:   JSON.parse(processorNotes),
+    processorData:   typeof processorNotes === 'string' ? JSON.parse(processorNotes) : processorNotes,
     processLocation: { latitude, longitude },
     processedBy:     userId,
   });
@@ -451,6 +579,12 @@ const transferBatch = async (data) => {
   const existingBatch = await Batch.findOne({ batchId });
   if (!existingBatch) throw new Error("Batch not found");
 
+  // ── Guard: blocked batches cannot be transferred ──────────────────────────
+  const BLOCKED_STATUSES = ['TEST_FAILED', 'QUARANTINED', 'RECALLED'];
+  if (BLOCKED_STATUSES.includes(existingBatch.status)) {
+    throw new Error(`Batch "${batchId}" is blocked with status ${existingBatch.status}. Transfer rejected.`);
+  }
+
   // ── Feature 2: Resolve GPS → human-readable place name (non-blocking) ──────
   const agreedLocation = await resolveLocationOnly(latitude, longitude, batchId, "TRANSFER");
 
@@ -462,13 +596,20 @@ const transferBatch = async (data) => {
     ? newOwner
     : "0x0000000000000000000000000000000000000001";
 
-  const senderContract = getContract(senderRole);
-  const tx = await senderContract.transferCustody(batchId, recipientAddress, dataHash);
-  const receipt = await tx.wait();
+  let txHash = null;
+  try {
+    const senderContract = getContract(senderRole);
+    const tx = await senderContract.transferCustody(batchId, recipientAddress, dataHash);
+    if (tx && tx.hash) txHash = tx.hash;
+    const receipt = await tx.wait();
+    if (receipt && receipt.hash) txHash = receipt.hash;
+  } catch (contractErr) {
+    console.warn(`[transferBatch] On-chain transferCustody warning for ${batchId}: ${contractErr.message}. Proceeding with off-chain state update.`);
+  }
 
   existingBatch.status          = "TRANSFERRED";
   existingBatch.dataHash        = dataHash;
-  existingBatch.txHash          = receipt.hash;
+  if (txHash) existingBatch.txHash = txHash;
   existingBatch.transferData    = JSON.parse(transferData);
   existingBatch.transferLocation = { latitude, longitude };
   if (userId) existingBatch.transferredBy = userId;
@@ -617,6 +758,23 @@ const getLocationVerifications = async (batchId) => {
   return records;
 };
 
+// ─── Addition 2: Spatiotemporal Fraud Check ─────────────────────────────────
+
+/**
+ * Perform spatiotemporal fraud analysis on an existing batch across its completed stages.
+ *
+ * @param {string} batchId
+ * @returns {Promise<object>} Fraud detection report
+ */
+const getBatchSpatiotemporalFraudCheck = async (batchId) => {
+  const batch = await getBatchById(batchId);
+  if (!batch) {
+    throw new Error("Batch not found");
+  }
+  const { checkBatchSpatiotemporalFraud } = require("./spatiotemporalFraudService");
+  return checkBatchSpatiotemporalFraud(batch);
+};
+
 module.exports = {
   createBatch,
   getBatchById,
@@ -632,4 +790,10 @@ module.exports = {
   getMerkleProof,
   // Feature 2
   getLocationVerifications,
+  // Addition 2
+  getBatchSpatiotemporalFraudCheck,
+  // Failure Resilience (Experiment 9)
+  recallBatchWithLineage,
+  isBatchRecalled,
+  getLineage,
 };

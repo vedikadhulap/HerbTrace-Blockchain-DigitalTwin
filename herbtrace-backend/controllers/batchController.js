@@ -1,4 +1,5 @@
 const batchService = require("../services/batchService");
+const { notifyDigitalTwinDirectly } = require("../services/blockchainSync");
 
 const createBatch = async (req, res) => {
   try {
@@ -12,6 +13,7 @@ const createBatch = async (req, res) => {
     }
 
     const batch = await batchService.createBatch({ ...req.body, userId: req.user?.userId });
+    notifyDigitalTwinDirectly(batch, req.app.get("io"));
     res.status(201).json(batch);
   } catch (error) {
     console.error("createBatch error:", error);
@@ -32,18 +34,24 @@ const getBatch = async (req, res) => {
 
 const labTest = async (req, res) => {
   try {
-    const { batchId, testResults } = req.body;
+    const { batchId, testResults, labOutcome } = req.body;
     if (!batchId || !testResults) {
       return res.status(400).json({ error: "batchId and testResults are required" });
     }
-    // batchService now returns { batch, agreedLocation } so we can surface the
-    // resolved place name (e.g. "Mumbai, Maharashtra") in the API response.
+    // Validate labOutcome early to give a clear 400 (not 500)
+    const VALID_OUTCOMES = ['PASS', 'FAIL', 'FLAGGED'];
+    if (labOutcome && !VALID_OUTCOMES.includes(labOutcome.toUpperCase())) {
+      return res.status(400).json({ error: `Invalid labOutcome "${labOutcome}". Must be PASS, FAIL, or FLAGGED` });
+    }
     const { batch, agreedLocation } = await batchService.recordLabTest({ ...req.body, userId: req.user?.userId });
-    res.status(200).json({ ...batch.toObject(), agreedLocation });
+    notifyDigitalTwinDirectly(batch, req.app.get("io"));
+    return res.status(200).json({ ...batch.toObject(), agreedLocation });
   } catch (error) {
     console.error("labTest error:", error);
     if (error.message === "Batch not found") return res.status(404).json({ error: error.message });
-    res.status(500).json({ error: error.message });
+    if (error.message.startsWith("Batch must be in CREATED state")) return res.status(409).json({ error: error.message });
+    if (error.message.startsWith("Invalid lab outcome")) return res.status(400).json({ error: error.message });
+    return res.status(500).json({ error: error.message });
   }
 };
 
@@ -54,9 +62,21 @@ const process = async (req, res) => {
       return res.status(400).json({ error: "newBatchId and parentBatchIds are required" });
     }
     const { batch, agreedLocation } = await batchService.processBatch({ ...req.body, userId: req.user?.userId });
+    notifyDigitalTwinDirectly(batch, req.app.get("io"));
     res.status(201).json({ ...batch.toObject(), agreedLocation });
   } catch (error) {
     console.error("process error:", error);
+    if (error.name === "PROCESSING_BLOCKED" || error.message.includes("cannot be processed") || error.message.includes("blocked")) {
+      return res.status(400).json({
+        success: false,
+        error: "PROCESSING_BLOCKED",
+        message: error.message,
+        batchId: error.batchId || (error.blockedParents && error.blockedParents[0]?.batchId) || null,
+        status: error.status || (error.blockedParents && error.blockedParents[0]?.status) || "TEST_FAILED",
+        reason: error.reason || error.message,
+        blockedParents: error.blockedParents || []
+      });
+    }
     if (error.message === "One or more parent batches not found") return res.status(404).json({ error: error.message });
     res.status(500).json({ error: error.message });
   }
@@ -69,6 +89,7 @@ const transfer = async (req, res) => {
       return res.status(400).json({ error: "batchId, newOwner, and senderRole are required" });
     }
     const { batch, agreedLocation } = await batchService.transferBatch({ ...req.body, userId: req.user?.userId });
+    notifyDigitalTwinDirectly(batch, req.app.get("io"));
     res.status(200).json({ ...batch.toObject(), agreedLocation });
   } catch (error) {
     console.error("transfer error:", error);
@@ -194,6 +215,20 @@ const getLocationVerification = async (req, res) => {
   }
 };
 
+// GET /batch/:batchId/spatiotemporal-fraud
+// Returns spatiotemporal fraud analysis for a batch.
+const getSpatiotemporalFraudCheck = async (req, res) => {
+  try {
+    const { batchId } = req.params;
+    const result = await batchService.getBatchSpatiotemporalFraudCheck(batchId);
+    res.status(200).json(result);
+  } catch (error) {
+    console.error("getSpatiotemporalFraudCheck error:", error);
+    if (error.message === "Batch not found") return res.status(404).json({ error: error.message });
+    res.status(500).json({ error: error.message });
+  }
+};
+
 module.exports = {
   createBatch, getBatch, labTest, process, transfer, verify,
   uploadImage, uploadDirect, getQRCode, getBatchCount, getRecentActivity,
@@ -201,4 +236,6 @@ module.exports = {
   getMerkleProof,
   // Feature 2: Multi-Oracle Location
   getLocationVerification,
+  // Addition 2: Spatiotemporal Fraud
+  getSpatiotemporalFraudCheck,
 };

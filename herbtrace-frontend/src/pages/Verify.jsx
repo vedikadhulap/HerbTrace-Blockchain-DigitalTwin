@@ -212,15 +212,19 @@ export default function Verify() {
                       <Sprout size={14} color="var(--fern)" /> Method: <strong>{batch.farmingMethod}</strong>
                     </span>
                   )}
-                  {batch.txHash && (
-                    <span style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 4 }}>
-                      <ExternalLink size={14} color="var(--text-muted)" />
+                  <span style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 4 }}>
+                    <ExternalLink size={14} color="var(--text-muted)" />
+                    {batch.txHash && batch.txHash.startsWith("0x") ? (
                       <a href={`https://sepolia.etherscan.io/tx/${batch.txHash}`} target="_blank" rel="noreferrer"
                         style={{ color: "var(--fern)", textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 4 }}>
                         Sepolia On-Chain Proof <ExternalLink size={11} />
                       </a>
-                    </span>
-                  )}
+                    ) : (
+                      <span style={{ color: "var(--text-muted)", fontSize: "0.82rem" }}>
+                        Sepolia proof unavailable
+                      </span>
+                    )}
+                  </span>
                 </div>
               </div>
 

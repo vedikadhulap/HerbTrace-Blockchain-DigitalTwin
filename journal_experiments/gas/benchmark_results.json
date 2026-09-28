@@ -1,0 +1,131 @@
+{
+  "timestamp": "2026-09-26T20:28:32.312Z",
+  "environment": "Hardhat Local Network",
+  "iterations": 10,
+  "metrics": {
+    "createBatch": {
+      "min": 119106,
+      "max": 119118,
+      "mean": 119115.6,
+      "median": 119118,
+      "stdDev": 4.8,
+      "measurements": [
+        119118,
+        119106,
+        119118,
+        119118,
+        119118,
+        119118,
+        119118,
+        119118,
+        119106,
+        119118
+      ]
+    },
+    "recordTest": {
+      "min": 49605,
+      "max": 49617,
+      "mean": 49614.6,
+      "median": 49617,
+      "stdDev": 4.8,
+      "measurements": [
+        49617,
+        49605,
+        49617,
+        49617,
+        49617,
+        49617,
+        49617,
+        49617,
+        49605,
+        49617
+      ]
+    },
+    "processBatch": {
+      "min": 176020,
+      "max": 176032,
+      "mean": 176029.6,
+      "median": 176032,
+      "stdDev": 4.8,
+      "measurements": [
+        176032,
+        176020,
+        176032,
+        176032,
+        176032,
+        176032,
+        176032,
+        176032,
+        176020,
+        176032
+      ]
+    },
+    "transferCustody": {
+      "min": 49843,
+      "max": 49855,
+      "mean": 49852.6,
+      "median": 49855,
+      "stdDev": 4.8,
+      "measurements": [
+        49855,
+        49843,
+        49855,
+        49855,
+        49855,
+        49855,
+        49855,
+        49855,
+        49843,
+        49855
+      ]
+    },
+    "anchorMerkleRoot": {
+      "min": 189160,
+      "max": 189172,
+      "mean": 189170.8,
+      "median": 189172,
+      "stdDev": 3.5999999999999996,
+      "measurements": [
+        189172,
+        189172,
+        189172,
+        189172,
+        189172,
+        189172,
+        189172,
+        189172,
+        189160,
+        189172
+      ]
+    },
+    "recordLocationVerification": {
+      "min": 146994,
+      "max": 146994,
+      "mean": 146994,
+      "median": 146994,
+      "stdDev": 0,
+      "measurements": [
+        146994,
+        146994,
+        146994,
+        146994,
+        146994,
+        146994,
+        146994,
+        146994,
+        146994,
+        146994
+      ]
+    }
+  },
+  "comparison": {
+    "baselineDefinition": "Controlled baseline architecture in which a Merkle root is anchored on-chain after each of the four lifecycle stages.",
+    "currentDesignDefinition": "The current HerbTrace design where the completed root is anchored at the final transfer stage.",
+    "baselineAnchorTransactions": 4,
+    "currentAnchorTransactions": 1,
+    "currentTotalGas": 583783.2,
+    "baselineTotalGas": 1151295.6,
+    "absoluteGasDifference": 567512.4000000001,
+    "percentageDifference": 49.29337000853648
+  }
+}

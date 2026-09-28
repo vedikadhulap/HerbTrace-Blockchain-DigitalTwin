@@ -78,7 +78,11 @@ export default function LabTest() {
 
     try {
       const res = await api.post("/batch/lab-test", {
-        batchId: batch.batchId, testResults,
+        batchId: batch.batchId,
+        testResults,
+        labOutcome: overallResult,
+        passed: overallResult === 'PASS',
+        labFailReason: overallResult === 'FAIL' ? (form.additionalNotes || 'Lab test failed quality standards') : '',
         latitude:  coords?.latitude  ?? 0,
         longitude: coords?.longitude ?? 0,
       });

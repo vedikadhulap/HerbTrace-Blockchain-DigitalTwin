@@ -1,0 +1,5 @@
+Scenario,BatchesCreated,ParentRelationshipsTested,ChainIdCorrect,ParentIdsCorrect,ProofsValid,Status
+Scenario A — Single Batch,1,1,1,1,1,PASSED
+Scenario B — Two-Batch Combination,3,1,1,1,1,PASSED
+Scenario C — Derived Batch Lifecycle,1,1,1,1,1,PASSED
+Scenario D — Lineage Isolation,4,2,1,1,1,PASSED

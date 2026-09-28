@@ -1,0 +1,5 @@
+Operation,Iterations,Min_ms,Max_ms,Mean_ms,Median_ms,StdDev_ms,P95_ms
+Leaf Generation,1000,0.0086,2.5137,0.03122,0.0135,0.14041,0.0479
+Tree Construction,1000,0.0098,1.5636,0.02483,0.0153,0.07333,0.0466
+Proof Generation,1000,0.0345,1.608,0.08935,0.06265,0.12005,0.1805
+Proof Verification,1000,0.0102,1.5603,0.02596,0.0161,0.06682,0.0474

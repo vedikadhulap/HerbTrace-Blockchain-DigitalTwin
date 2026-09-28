@@ -40,18 +40,28 @@ export default function ProcessBatch() {
     if (!parentInput.trim()) return;
     const ids = parentInput.split(",").map(s => s.trim()).filter(Boolean);
     setLookingUp(true); setLookupResults(null);
+    const BLOCKED = ['TEST_FAILED', 'QUARANTINED', 'RECALLED'];
     const results = await Promise.all(
       ids.map(async (id) => {
         try {
           const res = await api.get(`/batch/${id}`);
-          return { id, batch: res.data, found: true };
+          const b = res.data;
+          const isBlocked = BLOCKED.includes(b.status) || b.processingAllowed === false || (b.status !== 'TESTED' && b.status !== 'PROCESSED');
+          return {
+            id,
+            batch: b,
+            found: true,
+            valid: !isBlocked,
+            status: b.status,
+            reason: b.labFailReason || b.quarantineReason || b.recallReason || (isBlocked ? `Batch is in ${b.status} state` : null)
+          };
         } catch {
-          return { id, batch: null, found: false };
+          return { id, batch: null, found: false, valid: false, status: 'NOT_FOUND', reason: 'Batch not found' };
         }
       })
     );
     setLookupResults(results);
-    if (results.every(r => r.found)) {
+    if (results.length > 0 && results.every(r => r.valid)) {
       setConfirmedBatches(results.map(r => r.batch));
     } else {
       setConfirmedBatches([]);
@@ -60,7 +70,7 @@ export default function ProcessBatch() {
   };
 
   const allConfirmed = confirmedBatches.length > 0 &&
-    lookupResults && lookupResults.every(r => r.found);
+    lookupResults && lookupResults.length > 0 && lookupResults.every(r => r.valid);
 
   const requiredFilled = form.outputProductName && form.processingMethod && form.solventUsed &&
     form.outputQuantity && form.qualityGrade && form.storageConditions && form.expiryDate &&
@@ -166,23 +176,29 @@ export default function ProcessBatch() {
 
             {lookupResults && (
               <div style={{ marginTop: 14, display: "flex", flexDirection: "column", gap: 8 }} className="fade-in">
-                {lookupResults.map(({ id, batch, found }) => (
+                {lookupResults.map(({ id, batch, found, valid, status, reason }) => (
                   <div key={id} style={{
-                    padding: "12px 16px", borderRadius: 10, display: "flex", alignItems: "center", gap: 10,
-                    background: found ? "var(--fern-dim)" : "var(--danger-dim)",
-                    border: `1px solid ${found ? "var(--border-glow)" : "rgba(255,128,128,0.2)"}`,
+                    padding: "12px 16px", borderRadius: 10, display: "flex", flexDirection: "column", gap: 6,
+                    background: valid ? "var(--fern-dim)" : "rgba(255,80,80,0.12)",
+                    border: `1px solid ${valid ? "var(--border-glow)" : "rgba(255,80,80,0.35)"}`,
                   }}>
-                    {found ? <CheckCircle size={14} color="var(--fern)" /> : <XCircle size={14} color="var(--danger)" />}
-                    <code style={{ fontFamily: "var(--font-mono)", fontSize: "0.82rem", flex: 1 }}>{id}</code>
-                    {found && (
-                      <>
-                        <span style={{ fontSize: "0.82rem", color: "var(--text-secondary)" }}>{batch.herbType}</span>
-                        <StatusPill status={batch.status} />
-                        {batch.quantityKg && <span style={{ fontSize: "0.78rem", color: "var(--text-muted)" }}>{batch.quantityKg}kg</span>}
-                        {batch.farmLocation && <span style={{ fontSize: "0.78rem", color: "var(--text-muted)", display: "flex", gap: 4 }}><MapPin size={11} />{batch.farmLocation}</span>}
-                      </>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                      {valid ? <CheckCircle size={15} color="var(--fern)" /> : <XCircle size={15} color="#ff4d4d" />}
+                      <code style={{ fontFamily: "var(--font-mono)", fontSize: "0.85rem", flex: 1, fontWeight: "bold" }}>{id}</code>
+                      {found && (
+                        <>
+                          <span style={{ fontSize: "0.82rem", color: "var(--text-secondary)" }}>{batch.herbType}</span>
+                          <StatusPill status={batch.status} />
+                          {batch.quantityKg && <span style={{ fontSize: "0.78rem", color: "var(--text-muted)" }}>{batch.quantityKg}kg</span>}
+                        </>
+                      )}
+                      {!found && <span style={{ fontSize: "0.82rem", color: "#ff4d4d", fontWeight: "bold" }}>Not found</span>}
+                    </div>
+                    {!valid && found && (
+                      <div style={{ fontSize: "0.80rem", color: "#ff4d4d", background: "rgba(255,0,0,0.08)", padding: "6px 10px", borderRadius: 6, display: "flex", alignItems: "center", gap: 6 }}>
+                        <strong>❌ PROCESSING BLOCKED:</strong> {reason || `Batch status is ${status}. Cannot be used for processing.`}
+                      </div>
                     )}
-                    {!found && <span style={{ fontSize: "0.82rem", color: "var(--danger)" }}>Not found</span>}
                   </div>
                 ))}
               </div>

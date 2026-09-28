@@ -7,8 +7,14 @@ module.exports = {
 
   networks: {
     sepolia: {
-      url: process.env.SEPOLIA_RPC_URL,
-      accounts: [process.env.PRIVATE_KEY]
+      url: process.env.SEPOLIA_RPC_URL || process.env.ALCHEMY_RPC_URL,
+      accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : []
     }
+  },
+  etherscan: {
+    apiKey: process.env.ETHERSCAN_API_KEY || ""
+  },
+  sourcify: {
+    enabled: true
   }
 };

@@ -1,0 +1,118 @@
+{
+  "metadata": {
+    "experiment": "Experiment 5 — Merkle Proof Generation & Tamper Verification Benchmark",
+    "timestamp": "2026-09-26T08:50:25.146Z",
+    "serviceEvaluated": "herbtrace-backend/services/merkleService.js",
+    "warmupIterations": 50,
+    "timingIterations": 1000
+  },
+  "performance": {
+    "leafGenerationMs": {
+      "count": 1000,
+      "min": 0.0086,
+      "max": 2.5137,
+      "mean": 0.03122,
+      "median": 0.0135,
+      "stdDev": 0.14041,
+      "p95": 0.0479
+    },
+    "treeConstructionMs": {
+      "count": 1000,
+      "min": 0.0098,
+      "max": 1.5636,
+      "mean": 0.02483,
+      "median": 0.0153,
+      "stdDev": 0.07333,
+      "p95": 0.0466
+    },
+    "proofGenerationMs": {
+      "count": 1000,
+      "min": 0.0345,
+      "max": 1.608,
+      "mean": 0.08935,
+      "median": 0.06265,
+      "stdDev": 0.12005,
+      "p95": 0.1805
+    },
+    "proofVerificationMs": {
+      "count": 1000,
+      "min": 0.0102,
+      "max": 1.5603,
+      "mean": 0.02596,
+      "median": 0.0161,
+      "stdDev": 0.06682,
+      "p95": 0.0474
+    },
+    "totalSuccessfulRuns": 1000,
+    "totalFailedRuns": 0
+  },
+  "tamperDetection": {
+    "totalScenariosTested": 6,
+    "totalDetected": 6,
+    "totalMissed": 0,
+    "detectionRatePercentage": 100,
+    "scenarios": [
+      {
+        "id": "TAMPER-CREATE",
+        "stage": "CREATE",
+        "stageIndex": 0,
+        "description": "Farmer Location tampered from 'Pune, MH' to 'Nagpur, MH'",
+        "originalProofValid": true,
+        "verificationResult": "INVALID (REJECTED)",
+        "tamperDetected": "YES ✅"
+      },
+      {
+        "id": "TAMPER-TEST",
+        "stage": "LAB TEST",
+        "stageIndex": 1,
+        "description": "Purity percentage modified from 98.7% to 75.0%",
+        "originalProofValid": true,
+        "verificationResult": "INVALID (REJECTED)",
+        "tamperDetected": "YES ✅"
+      },
+      {
+        "id": "TAMPER-PROCESS",
+        "stage": "PROCESS",
+        "stageIndex": 2,
+        "description": "Yield output inflated from 450kg to 900kg",
+        "originalProofValid": true,
+        "verificationResult": "INVALID (REJECTED)",
+        "tamperDetected": "YES ✅"
+      },
+      {
+        "id": "TAMPER-TRANSFER",
+        "stage": "TRANSFER",
+        "stageIndex": 3,
+        "description": "Destination owner altered to unauthorized wallet address",
+        "originalProofValid": true,
+        "verificationResult": "INVALID (REJECTED)",
+        "tamperDetected": "YES ✅"
+      },
+      {
+        "id": "TAMPER-ROOT-BITFLIP",
+        "stage": "ROOT HASH",
+        "stageIndex": 0,
+        "description": "Single bit modified in anchored Merkle root hash",
+        "originalProofValid": true,
+        "verificationResult": "INVALID (REJECTED)",
+        "tamperDetected": "YES ✅"
+      },
+      {
+        "id": "TAMPER-PROOF-SIBLING",
+        "stage": "PROOF SIBLING",
+        "stageIndex": 1,
+        "description": "Proof sibling hash corrupted by replacing with random hash",
+        "originalProofValid": true,
+        "verificationResult": "INVALID (REJECTED)",
+        "tamperDetected": "YES ✅"
+      }
+    ]
+  },
+  "lifecycleVerification": {
+    "totalStages": 4,
+    "validProofs": 4,
+    "invalidProofs": 0,
+    "rootHash": "f91b00646ca20664ae39f904cb93167768bcb1a92e9463d3b7f3e9959e2f06b0",
+    "overallResult": "PASSED"
+  }
+}

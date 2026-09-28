@@ -1,12 +1,23 @@
 const express = require("express");
 const router = express.Router();
 const batchController = require("../controllers/batchController");
+const { recallBatch, getLineage, getRecallStatus, reconcileSingle, reconcileAll } = require("../controllers/recallController");
 const upload = require("../middleware/upload");
-//const protect = require("../middleware/authMiddleware");
+const protect = require("../middleware/authMiddleware");
 
 // Public stat endpoints for home page
 router.get("/count", batchController.getBatchCount);
 router.get("/recent", batchController.getRecentActivity);
+
+// ─── Recall — admin-only write endpoint ─────────────────────────────────────
+// POST /batch/recall — initiates lineage-based recall
+router.post("/recall", protect("admin"), recallBatch);
+
+// ─── Reconciliation — admin-only read endpoints ──────────────────────────────
+// GET /batch/reconcile — reconcile all batches (paginated)
+router.get("/reconcile", protect("admin"), reconcileAll);
+// GET /batch/reconcile/:batchId — reconcile a single batch
+router.get("/reconcile/:batchId", protect("admin"), reconcileSingle);
 
 // Authenticated write endpoints
 router.post("/", batchController.createBatch);
@@ -17,7 +28,12 @@ router.post("/transfer", batchController.transfer);
 // Public read endpoints
 router.get("/verify/:batchId", batchController.verify);
 router.get("/qrcode/:batchId", batchController.getQRCode);
-router.get("/:id", batchController.getBatch);
+
+// ─── Failure Resilience — lineage & recall status ─────────────────────────────
+// GET /batch/:batchId/lineage — return full lineage chain for a batch
+router.get("/:batchId/lineage", getLineage);
+// GET /batch/:batchId/recall-status — check if a batch is recalled/blocked
+router.get("/:batchId/recall-status", getRecallStatus);
 
 // ─── Feature 1: Stage-Wise Merkle Anchoring ──────────────────────────────────
 // Public — transparency endpoint. Anyone can fetch the Merkle proof for any
@@ -30,12 +46,18 @@ router.get("/:batchId/merkle-proof/:stageIndex", batchController.getMerkleProof)
 // Returns per-stage consensus verdicts (verified / low_confidence / no_data).
 router.get("/:batchId/location-verification", batchController.getLocationVerification);
 
+// ─── Addition 2: Spatiotemporal Fraud Detection ─────────────────────────────
+// Public — security endpoint showing spatiotemporal movement fraud analysis for a batch.
+router.get("/:batchId/spatiotemporal-fraud", batchController.getSpatiotemporalFraudCheck);
+
+// Generic single-batch get (must come AFTER specific sub-paths)
+router.get("/:id", batchController.getBatch);
+
 // File upload — attached to an existing batch (batchId required in body)
 router.post("/upload-image", upload.single("image"), batchController.uploadImage);
 
 // Direct file upload — no batch required, returns IPFS URL
 // Used for signup proof documents. Unprotected for now.
-// TODO: add protect() for any-authenticated-role once middleware supports it
 router.post("/upload-direct", upload.single("image"), batchController.uploadDirect);
 
 module.exports = router;

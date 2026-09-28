@@ -4,7 +4,7 @@ import {
 } from "react-router-dom";
 import {
   Leaf, Search, LogOut, Sun, Moon, ShieldCheck,
-  Sprout, FlaskConical, Settings2, Truck, UserPlus, LogIn, User,
+  Sprout, FlaskConical, Settings2, Truck, UserPlus, LogIn, User, Activity,
 } from "lucide-react";
 
 import { useTheme }       from "./hooks/useTheme";
@@ -21,6 +21,7 @@ import ProcessBatch      from "./pages/ProcessBatch";
 import TransferCustody   from "./pages/TransferCustody";
 import Admin             from "./pages/Admin";
 import Profile           from "./pages/Profile";
+import DigitalTwin       from "./pages/DigitalTwin";
 
 import "./index.css";
 import "./App.css";
@@ -57,6 +58,7 @@ function Nav() {
       </NavLink>
 
       {navLink("/verify", "Verify", Search)}
+      {navLink("/digital-twin", "Digital Twin", Activity)}
 
       {!role && navLink("/login",  "Sign In",  LogIn)}
       {!role && navLink("/signup", "Sign Up",  UserPlus)}
@@ -98,11 +100,12 @@ function Nav() {
 function AppInner() {
   const location = useLocation();
   const isHome   = location.pathname === "/";
+  const isDT     = location.pathname === "/digital-twin";
 
   return (
     <div className="app-shell">
       <Nav />
-      <div className={`page-content${isHome ? " full-width" : ""}`}>
+      <div className={`page-content${isHome || isDT ? " full-width" : ""}`}>
         <Routes>
           <Route path="/"              element={<Home />} />
           <Route path="/login"         element={<Login />} />
@@ -110,6 +113,7 @@ function AppInner() {
           <Route path="/pending"       element={<PendingApproval />} />
           <Route path="/verify"        element={<Verify />} />
           <Route path="/verify/:batchId" element={<Verify />} />
+          <Route path="/digital-twin"  element={<DigitalTwin />} />
 
           <Route path="/create-batch"  element={<ProtectedRoute requiredRole="farmer">      <CreateBatch />    </ProtectedRoute>} />
           <Route path="/lab-test"      element={<ProtectedRoute requiredRole="lab">         <LabTest />        </ProtectedRoute>} />

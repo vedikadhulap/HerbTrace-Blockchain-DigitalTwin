@@ -23,7 +23,7 @@ const batchSchema = new mongoose.Schema(
     harvestDate: { type: Date },
     quantityKg:  { type: Number },
     images:      [{ type: String }], // IPFS URLs
-    status:      { type: String, enum: ["CREATED", "TESTED", "PROCESSED", "TRANSFERRED"], default: "CREATED" },
+    status:      { type: String, enum: ["CREATED", "TESTED", "PROCESSED", "TRANSFERRED", "TEST_FAILED", "QUARANTINED", "RECALLED"], default: "CREATED" },
     dataHash:    { type: String, required: true }, // hash written on-chain
     txHash:      { type: String }, // Ethereum transaction hash — look up on Etherscan
 
@@ -32,6 +32,18 @@ const batchSchema = new mongoose.Schema(
     testedBy:      { type: mongoose.Schema.Types.ObjectId, ref: "User" }, // Lab user ID
     processedBy:   { type: mongoose.Schema.Types.ObjectId, ref: "User" }, // Processor user ID
     transferredBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" }, // Distributor user ID
+
+    // Lab outcome — track explicit PASS/FAIL/FLAGGED result
+    labOutcome:   { type: String, enum: ["PASS", "FAIL", "FLAGGED"], default: null },
+    labFailReason:{ type: String, default: null }, // reason when outcome = FAIL
+
+    // Recall tracking
+    recalledAt:   { type: Date, default: null },
+    recalledBy:   { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+    recallReason: { type: String, default: null },
+
+    // Quarantine tracking
+    quarantineReason: { type: String, default: null },
 
     // Lineage — parent raw batches that were combined in processBatch
     parentBatchIds: [{ type: String }],

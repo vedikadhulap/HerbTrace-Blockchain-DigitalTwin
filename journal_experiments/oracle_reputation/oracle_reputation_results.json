@@ -1,0 +1,407 @@
+{
+  "metadata": {
+    "experiment": "Experiment 7 — Reputation-Weighted Oracle Consensus under a Synthetic Outlier",
+    "timestamp": "2026-09-26T14:33:17.047Z",
+    "nodeVersion": "v22.14.0",
+    "totalRounds": 20,
+    "consensusThresholdM": 100,
+    "emaAlpha": 0.2,
+    "groundTruth": {
+      "name": "Ground Truth (Pune, MH)",
+      "lat": 18.5204,
+      "lon": 73.8567
+    },
+    "outlierCoordinates": {
+      "lat": 18.5249,
+      "lon": 73.8567
+    },
+    "outlierDistanceMeters": 500.38
+  },
+  "oracleConfiguration": [
+    {
+      "oracle": "nominatim",
+      "role": "Accurate Oracle 1",
+      "behavior": "Accurate (Ground Truth)",
+      "coords": "18.5204, 73.8567",
+      "approxDistanceM": 0
+    },
+    {
+      "oracle": "bigdatacloud",
+      "role": "Accurate Oracle 2",
+      "behavior": "Accurate (Ground Truth)",
+      "coords": "18.5204, 73.8567",
+      "approxDistanceM": 0
+    },
+    {
+      "oracle": "geocode.maps.co",
+      "role": "Accurate Oracle 3",
+      "behavior": "Accurate (Ground Truth)",
+      "coords": "18.5204, 73.8567",
+      "approxDistanceM": 0
+    },
+    {
+      "oracle": "opencage",
+      "role": "Injected Synthetic Outlier",
+      "behavior": "Controlled Synthetic Outlier (~500m shift)",
+      "coords": "18.5249, 73.8567",
+      "approxDistanceM": 500.38
+    }
+  ],
+  "consensusComparison": {
+    "totalRounds": 20,
+    "plainMajority": {
+      "correctRounds": 20,
+      "incorrectRounds": 0,
+      "agreementRatePercentage": 100
+    },
+    "reputationWeighted": {
+      "correctRounds": 20,
+      "incorrectRounds": 0,
+      "agreementRatePercentage": 100
+    }
+  },
+  "reputationEvolution": {
+    "oracles": [
+      {
+        "oracle": "nominatim",
+        "initialReputation": 1,
+        "finalReputation": 1,
+        "change": 0,
+        "percentageChange": 0
+      },
+      {
+        "oracle": "bigdatacloud",
+        "initialReputation": 1,
+        "finalReputation": 1,
+        "change": 0,
+        "percentageChange": 0
+      },
+      {
+        "oracle": "geocode.maps.co",
+        "initialReputation": 1,
+        "finalReputation": 1,
+        "change": 0,
+        "percentageChange": 0
+      },
+      {
+        "oracle": "opencage",
+        "initialReputation": 1,
+        "finalReputation": 0.0116,
+        "change": -0.9884,
+        "percentageChange": -98.84
+      }
+    ],
+    "outlierSpecifics": {
+      "oracle": "opencage",
+      "initialReputation": 1,
+      "finalReputation": 0.0116,
+      "absoluteReduction": 0.9884,
+      "percentageReduction": 98.84,
+      "roundsDisagreedWithQuorum": 20,
+      "roundsDownWeighted": 20,
+      "weightedConsensusRemainedCorrect": true
+    }
+  },
+  "roundLogs": [
+    {
+      "round": 1,
+      "repNominatim": 1,
+      "repBigDataCloud": 1,
+      "repGeocodeMaps": 1,
+      "repOpenCage": 0.8,
+      "majorityVerified": true,
+      "weightedVerified": true,
+      "agreements": {
+        "nominatim": 1,
+        "bigdatacloud": 1,
+        "geocode.maps.co": 1,
+        "opencage": 0
+      }
+    },
+    {
+      "round": 2,
+      "repNominatim": 1,
+      "repBigDataCloud": 1,
+      "repGeocodeMaps": 1,
+      "repOpenCage": 0.64,
+      "majorityVerified": true,
+      "weightedVerified": true,
+      "agreements": {
+        "nominatim": 1,
+        "bigdatacloud": 1,
+        "geocode.maps.co": 1,
+        "opencage": 0
+      }
+    },
+    {
+      "round": 3,
+      "repNominatim": 1,
+      "repBigDataCloud": 1,
+      "repGeocodeMaps": 1,
+      "repOpenCage": 0.512,
+      "majorityVerified": true,
+      "weightedVerified": true,
+      "agreements": {
+        "nominatim": 1,
+        "bigdatacloud": 1,
+        "geocode.maps.co": 1,
+        "opencage": 0
+      }
+    },
+    {
+      "round": 4,
+      "repNominatim": 1,
+      "repBigDataCloud": 1,
+      "repGeocodeMaps": 1,
+      "repOpenCage": 0.4096,
+      "majorityVerified": true,
+      "weightedVerified": true,
+      "agreements": {
+        "nominatim": 1,
+        "bigdatacloud": 1,
+        "geocode.maps.co": 1,
+        "opencage": 0
+      }
+    },
+    {
+      "round": 5,
+      "repNominatim": 1,
+      "repBigDataCloud": 1,
+      "repGeocodeMaps": 1,
+      "repOpenCage": 0.3277,
+      "majorityVerified": true,
+      "weightedVerified": true,
+      "agreements": {
+        "nominatim": 1,
+        "bigdatacloud": 1,
+        "geocode.maps.co": 1,
+        "opencage": 0
+      }
+    },
+    {
+      "round": 6,
+      "repNominatim": 1,
+      "repBigDataCloud": 1,
+      "repGeocodeMaps": 1,
+      "repOpenCage": 0.2622,
+      "majorityVerified": true,
+      "weightedVerified": true,
+      "agreements": {
+        "nominatim": 1,
+        "bigdatacloud": 1,
+        "geocode.maps.co": 1,
+        "opencage": 0
+      }
+    },
+    {
+      "round": 7,
+      "repNominatim": 1,
+      "repBigDataCloud": 1,
+      "repGeocodeMaps": 1,
+      "repOpenCage": 0.2098,
+      "majorityVerified": true,
+      "weightedVerified": true,
+      "agreements": {
+        "nominatim": 1,
+        "bigdatacloud": 1,
+        "geocode.maps.co": 1,
+        "opencage": 0
+      }
+    },
+    {
+      "round": 8,
+      "repNominatim": 1,
+      "repBigDataCloud": 1,
+      "repGeocodeMaps": 1,
+      "repOpenCage": 0.1678,
+      "majorityVerified": true,
+      "weightedVerified": true,
+      "agreements": {
+        "nominatim": 1,
+        "bigdatacloud": 1,
+        "geocode.maps.co": 1,
+        "opencage": 0
+      }
+    },
+    {
+      "round": 9,
+      "repNominatim": 1,
+      "repBigDataCloud": 1,
+      "repGeocodeMaps": 1,
+      "repOpenCage": 0.1342,
+      "majorityVerified": true,
+      "weightedVerified": true,
+      "agreements": {
+        "nominatim": 1,
+        "bigdatacloud": 1,
+        "geocode.maps.co": 1,
+        "opencage": 0
+      }
+    },
+    {
+      "round": 10,
+      "repNominatim": 1,
+      "repBigDataCloud": 1,
+      "repGeocodeMaps": 1,
+      "repOpenCage": 0.1074,
+      "majorityVerified": true,
+      "weightedVerified": true,
+      "agreements": {
+        "nominatim": 1,
+        "bigdatacloud": 1,
+        "geocode.maps.co": 1,
+        "opencage": 0
+      }
+    },
+    {
+      "round": 11,
+      "repNominatim": 1,
+      "repBigDataCloud": 1,
+      "repGeocodeMaps": 1,
+      "repOpenCage": 0.0859,
+      "majorityVerified": true,
+      "weightedVerified": true,
+      "agreements": {
+        "nominatim": 1,
+        "bigdatacloud": 1,
+        "geocode.maps.co": 1,
+        "opencage": 0
+      }
+    },
+    {
+      "round": 12,
+      "repNominatim": 1,
+      "repBigDataCloud": 1,
+      "repGeocodeMaps": 1,
+      "repOpenCage": 0.0687,
+      "majorityVerified": true,
+      "weightedVerified": true,
+      "agreements": {
+        "nominatim": 1,
+        "bigdatacloud": 1,
+        "geocode.maps.co": 1,
+        "opencage": 0
+      }
+    },
+    {
+      "round": 13,
+      "repNominatim": 1,
+      "repBigDataCloud": 1,
+      "repGeocodeMaps": 1,
+      "repOpenCage": 0.055,
+      "majorityVerified": true,
+      "weightedVerified": true,
+      "agreements": {
+        "nominatim": 1,
+        "bigdatacloud": 1,
+        "geocode.maps.co": 1,
+        "opencage": 0
+      }
+    },
+    {
+      "round": 14,
+      "repNominatim": 1,
+      "repBigDataCloud": 1,
+      "repGeocodeMaps": 1,
+      "repOpenCage": 0.044,
+      "majorityVerified": true,
+      "weightedVerified": true,
+      "agreements": {
+        "nominatim": 1,
+        "bigdatacloud": 1,
+        "geocode.maps.co": 1,
+        "opencage": 0
+      }
+    },
+    {
+      "round": 15,
+      "repNominatim": 1,
+      "repBigDataCloud": 1,
+      "repGeocodeMaps": 1,
+      "repOpenCage": 0.0352,
+      "majorityVerified": true,
+      "weightedVerified": true,
+      "agreements": {
+        "nominatim": 1,
+        "bigdatacloud": 1,
+        "geocode.maps.co": 1,
+        "opencage": 0
+      }
+    },
+    {
+      "round": 16,
+      "repNominatim": 1,
+      "repBigDataCloud": 1,
+      "repGeocodeMaps": 1,
+      "repOpenCage": 0.0282,
+      "majorityVerified": true,
+      "weightedVerified": true,
+      "agreements": {
+        "nominatim": 1,
+        "bigdatacloud": 1,
+        "geocode.maps.co": 1,
+        "opencage": 0
+      }
+    },
+    {
+      "round": 17,
+      "repNominatim": 1,
+      "repBigDataCloud": 1,
+      "repGeocodeMaps": 1,
+      "repOpenCage": 0.0226,
+      "majorityVerified": true,
+      "weightedVerified": true,
+      "agreements": {
+        "nominatim": 1,
+        "bigdatacloud": 1,
+        "geocode.maps.co": 1,
+        "opencage": 0
+      }
+    },
+    {
+      "round": 18,
+      "repNominatim": 1,
+      "repBigDataCloud": 1,
+      "repGeocodeMaps": 1,
+      "repOpenCage": 0.0181,
+      "majorityVerified": true,
+      "weightedVerified": true,
+      "agreements": {
+        "nominatim": 1,
+        "bigdatacloud": 1,
+        "geocode.maps.co": 1,
+        "opencage": 0
+      }
+    },
+    {
+      "round": 19,
+      "repNominatim": 1,
+      "repBigDataCloud": 1,
+      "repGeocodeMaps": 1,
+      "repOpenCage": 0.0145,
+      "majorityVerified": true,
+      "weightedVerified": true,
+      "agreements": {
+        "nominatim": 1,
+        "bigdatacloud": 1,
+        "geocode.maps.co": 1,
+        "opencage": 0
+      }
+    },
+    {
+      "round": 20,
+      "repNominatim": 1,
+      "repBigDataCloud": 1,
+      "repGeocodeMaps": 1,
+      "repOpenCage": 0.0116,
+      "majorityVerified": true,
+      "weightedVerified": true,
+      "agreements": {
+        "nominatim": 1,
+        "bigdatacloud": 1,
+        "geocode.maps.co": 1,
+        "opencage": 0
+      }
+    }
+  ]
+}
