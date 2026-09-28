@@ -1,0 +1,78 @@
+{
+  "timestamp": "2026-09-21T20:11:56.661Z",
+  "testsExecuted": 9,
+  "results": [
+    {
+      "testName": "Inherit chainId",
+      "input": "parent=BATCH-ROOT-123, child=BATCH-PROC-123",
+      "expected": "BATCH-ROOT-123",
+      "actual": "BATCH-ROOT-123",
+      "pass": true,
+      "executionTimeMs": 53
+    },
+    {
+      "testName": "Anchor Merkle Root",
+      "input": "166a4ecc448884a234cd800edb8db9f89795b46381d3f5a480a6a6ff92fbeeb1",
+      "expected": "0x166a4ecc448884a234cd800edb8db9f89795b46381d3f5a480a6a6ff92fbeeb1",
+      "actual": "0x166a4ecc448884a234cd800edb8db9f89795b46381d3f5a480a6a6ff92fbeeb1",
+      "pass": true,
+      "executionTimeMs": 83
+    },
+    {
+      "testName": "Verify Valid Proof",
+      "input": "TEST stage proof",
+      "expected": true,
+      "actual": true,
+      "pass": true,
+      "executionTimeMs": 84
+    },
+    {
+      "testName": "Tamper CREATE data",
+      "input": "quantityKg: 500",
+      "expected": false,
+      "actual": false,
+      "pass": true,
+      "executionTimeMs": 84
+    },
+    {
+      "testName": "Tamper TEST data",
+      "input": "testResults: Fail",
+      "expected": false,
+      "actual": false,
+      "pass": true,
+      "executionTimeMs": 84
+    },
+    {
+      "testName": "Tamper PROCESS data",
+      "input": "processorNotes: Cut with fillers",
+      "expected": false,
+      "actual": false,
+      "pass": true,
+      "executionTimeMs": 84
+    },
+    {
+      "testName": "Tamper TRANSFER data",
+      "input": "transferData: Shipped to US",
+      "expected": false,
+      "actual": false,
+      "pass": true,
+      "executionTimeMs": 84
+    },
+    {
+      "testName": "Tamper parentBatchIds",
+      "input": "parentBatchIds: ['FAKE-PARENT-999']",
+      "expected": false,
+      "actual": false,
+      "pass": true,
+      "executionTimeMs": 84
+    },
+    {
+      "testName": "Tamper chainId root (DB)",
+      "input": "altered root in db",
+      "expected": false,
+      "actual": false,
+      "pass": true,
+      "executionTimeMs": 84
+    }
+  ]
+}
